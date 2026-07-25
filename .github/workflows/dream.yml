@@ -19,8 +19,8 @@ jobs:
       - name: Install Dependencies
         run: |
           pip install requests
-          if [ -f package.json ]; then npm install; fi
-      - name: Execute Eon Cloud Brain (523 Models)
+          npm install node-fetch socks-proxy-agent
+      - name: Execute Eon Cloud Brain
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         run: python3 cloud_tg.py
