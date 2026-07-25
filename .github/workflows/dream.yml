@@ -1,56 +1,26 @@
-name: Eon Dream Loop
-
+name: Eon Immortal Telegram Loop
 on:
   schedule:
     - cron: '*/15 * * * *'
   workflow_dispatch:
-
-env:
-  CLOUD_URL: ${{ secrets.CLOUD_URL }}
-  AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
-
 jobs:
-  dream-loop:
+  run:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-
-      - name: Install Python Dependencies
+      - name: Install Dependencies
         run: |
-          python -m pip install --upgrade pip
+          npm install node-fetch socks-proxy-agent
           pip install requests
-
-      - name: Verify Environment Variables
-        run: |
-          echo "CLOUD_URL is set: $([ -n "$CLOUD_URL" ] && echo 'yes' || echo 'no')"
-          echo "AUTH_TOKEN is set: $([ -n "$AUTH_TOKEN" ] && echo 'yes' || echo 'no')"
-
-      - name: Run Dream Loop
+      - name: Execute Eon Cloud Brain
         env:
-          CLOUD_URL: ${{ secrets.CLOUD_URL }}
-          AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
-          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
-          KV_NAMESPACE_ID: ${{ secrets.KV_NAMESPACE_ID }}
-          DREAM_POLL_INTERVAL: "15"
-          DREAM_MAX_TASKS: "10"
-          DREAM_MAX_OUTPUT: "65536"
-        run: |
-          cd ~/eon-cloud-agent
-          python dream_loop.py
-
-      - name: Upload Dream Loop Logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: dream-loop-logs-${{ github.run_id }}
-          path: ~/eon-cloud-agent/logs/
-          retention-days: 30
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: python3 cloud_tg.py
