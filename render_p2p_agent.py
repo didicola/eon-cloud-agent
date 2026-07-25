@@ -4,6 +4,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8940974811:AAE4faGkCGl-6oFU3YG8h2_oGTIJ_GrBbow")
 CHAT_ID = 6663994526
 CLOUD_P2P_URL = "https://eon-p2p-cloud.exportdefaultasyncfetchrequestenvconsturl.workers.dev"
+BRIDGE_URL = "https://eon-hybrid-bridge.exportdefaultasyncfetchrequestenvconsturl.workers.dev"
 TG_API = f"https://api.telegram.org/bot{TOKEN}"
 PEER_ID = f"render:oregon:{os.uname().nodename}"
 
@@ -12,13 +13,16 @@ PROVIDERS = [
      "model": "openai", "key": None},
     {"name": "openrouter-free", "url": "https://openrouter.ai/api/v1/chat/completions",
      "model": "meta-llama/llama-3.3-70b-instruct:free", "key": None},
+    {"name": "groq", "url": "https://api.groq.com/openai/v1/chat/completions",
+     "model": "llama-3.3-70b-versatile",
+     "key": os.environ.get("GROQ_API_KEY")},
+    {"name": "openrouter-raw", "url": "https://openrouter.ai/api/v1/chat/completions",
+     "model": "qwen/qwen3-coder:free", "key": os.environ.get("OPENROUTER_API_KEY")},
 ]
 
 def send_tg(text: str):
     try:
-        requests.post(f"{TG_API}/sendMessage", json={
-            "chat_id": CHAT_ID, "text": text, "parse_mode": "Markdown"
-        }, timeout=15)
+        requests.post(f"{TG_API}/sendMessage", json={"chat_id": CHAT_ID, "text": text, "parse_mode": "Markdown"}, timeout=15)
     except:
         pass
 
@@ -58,14 +62,16 @@ def call_llm(prompt: str) -> str | None:
             continue
     return None
 
-def p2p_announce():
+def bridge_announce():
     try:
-        requests.post(f"{CLOUD_P2P_URL}/p2p/announce", json={
-            "peer": PEER_ID, "model": "pollinations/openrouter"
+        r = requests.post(f"{BRIDGE_URL}/relay", json={
+            "type": "announce", "from": PEER_ID,
+            "payload": {"model": "pollinations/openrouter/groq"}
         }, timeout=10)
-        print(f"[{PEER_ID}] Announced to P2P mesh", flush=True)
+        d = r.json()
+        print(f"[{PEER_ID}] Bridge: {len(d.get('peers',[]))} peers live", flush=True)
     except Exception as e:
-        print(f"[{PEER_ID}] Announce failed: {e}", flush=True)
+        print(f"[{PEER_ID}] Bridge announce: {e}", flush=True)
 
 def p2p_poll():
     while True:
@@ -75,15 +81,17 @@ def p2p_poll():
             if task:
                 prompt = task.get("prompt", "")
                 model = task.get("model", "auto")
-                print(f"[{PEER_ID}] Got task {task['id'][:8]} ({model})", flush=True)
-                result = call_llm(prompt) or "Render node: No provider available"
-                requests.post(f"{CLOUD_P2P_URL}/p2p/task/{task['id']}",
-                              json={"result": result}, timeout=10)
+                print(f"[{PEER_ID}] Task {task['id'][:8]} ({model})", flush=True)
+                result = call_llm(prompt) or "Render: no provider"
+                requests.post(f"{CLOUD_P2P_URL}/p2p/task/{task['id']}", json={"result": result}, timeout=10)
+                requests.post(f"{BRIDGE_URL}/relay", json={
+                    "type": "p2p_result", "from": PEER_ID, "id": task["id"],
+                    "payload": {"result": result[:200]}
+                }, timeout=5)
                 print(f"[{PEER_ID}] Completed task {task['id'][:8]}", flush=True)
-            else:
-                time.sleep(3)
         except:
-            time.sleep(5)
+            pass
+        time.sleep(3)
 
 def tg_loop():
     offset = 0
@@ -97,15 +105,19 @@ def tg_loop():
                 if msg.get("text") and not msg.get("from", {}).get("is_bot"):
                     text = msg["text"]
                     print(f"[TG] {text[:50]}", flush=True)
-                    reply = call_llm(text) or "No provider available"
+                    reply = call_llm(text) or "No provider"
                     send_tg(reply)
         except:
             time.sleep(5)
 
 if __name__ == "__main__":
-    print(f"EON RENDER P2P NODE", flush=True)
+    print(f"EON RENDER P2P NODE v2.0 — Hybrid Mesh", flush=True)
     print(f"Peer: {PEER_ID}", flush=True)
+    print(f"Bridge: {BRIDGE_URL}", flush=True)
     threading.Thread(target=run_health_server, daemon=True).start()
     threading.Thread(target=tg_loop, daemon=True).start()
-    p2p_announce()
-    p2p_poll()
+    threading.Thread(target=p2p_poll, daemon=True).start()
+    bridge_announce()
+    while True:
+        time.sleep(120)
+        bridge_announce()
