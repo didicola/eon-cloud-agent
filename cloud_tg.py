@@ -18,13 +18,12 @@ try:
         
     msg = res["result"][0].get("message", {})
     if str(msg.get("chat", {}).get("id")) != CHAT_ID or not msg.get("text"):
-        print("Message not from Creator or no text.")
         sys.exit(0)
         
     text = msg["text"]
     print(f"Received from Creator: {text}")
     
-    # Route to the LOCAL blind-proxy running on this GitHub VM
+    # Route to the LOCAL blind-proxy running on this GitHub VM (Port 8090)
     llm_res = requests.post("http://127.0.0.1:8090/v1/chat/completions", json={
         "model": "auto",
         "messages": [{"role": "user", "content": text}],
