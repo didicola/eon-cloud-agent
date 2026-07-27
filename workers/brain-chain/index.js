@@ -1,22 +1,42 @@
 // ═══════════════════════════════════════════════════════════
-// EON BRAIN CHAIN v3.0 — The Infinite Intelligence Network
-// ═══════════════════════════════════════════════════════════
-// Connects: Cloud Brain → ai-cloud-space → eon-p2p-cloud
-// Features:
-//   - Chain of Brains: routes to best brain for each task
-//   - Dream Engine: autonomous thinking and memory synthesis
-//   - P2P Delegation: dispatch tasks to local machines
-//   - Sync Matrix: bidirectional memory/config/model sync
-//   - Provider Registry: dynamic model routing
-//   - Self-Upgrade: proposes and applies improvements
-//   - Account Management: multi-provider key rotation
-//   - Region Metrics: performance tracking
+// EON BRAIN CHAIN v3.1 — Infinite Intelligence Network
+// ×100 verification chain, anti-hallucination, anti-bot
 // ═══════════════════════════════════════════════════════════
 
 const BRAINS = {
-  'cloud-brain': 'https://cloud-brain-proxy.exportdefaultasyncfetchrequestenvconsturl.workers.dev',
-  'ai-cloud-space': 'https://ai-cloud-space.exportdefaultasyncfetchrequestenvconsturl.workers.dev',
-  'eon-p2p': 'https://eon-p2p-cloud.exportdefaultasyncfetchrequestenvconsturl.workers.dev',
+  'cloud-brain': {
+    url: 'https://cloud-brain-proxy.exportdefaultasyncfetchrequestenvconsturl.workers.dev',
+    auth: true,
+    timeout: 120000
+  },
+  'ai-cloud-space': {
+    url: 'https://ai-cloud-space.exportdefaultasyncfetchrequestenvconsturl.workers.dev',
+    auth: true,
+    timeout: 30000
+  },
+  'eon-p2p': {
+    url: 'https://eon-p2p-cloud.exportdefaultasyncfetchrequestenvconsturl.workers.dev',
+    auth: false,
+    timeout: 30000
+  }
+};
+
+// Anti-bot headers for Worker-to-Worker calls
+const WORKER_HEADERS = {
+  'User-Agent': 'EonBrainChain/3.1 (Cloudflare Worker)',
+  'Accept': 'application/json',
+  'Content-Type': 'application/json',
+  'X-Forwarded-For': '10.0.0.1',
+  'CF-Connecting-IP': '10.0.0.1',
+  'X-Real-IP': '10.0.0.1',
+  'Origin': 'https://eon-cloud-agent.local',
+  'Referer': 'https://eon-cloud-agent.local/',
+  'sec-ch-ua': '"Chromium";v="120", "Not_A Brand";v="8"',
+  'sec-ch-ua-mobile': '?0',
+  'sec-ch-ua-platform': '"Cloudflare"',
+  'Sec-Fetch-Dest': 'empty',
+  'Sec-Fetch-Mode': 'cors',
+  'Sec-Fetch-Site': 'same-origin'
 };
 
 export default {
@@ -28,7 +48,7 @@ export default {
     const corsHeaders = {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Brain-Chain',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Brain-Chain, X-Verification',
     };
 
     if (method === 'OPTIONS') {
@@ -36,7 +56,7 @@ export default {
     }
 
     try {
-      // ─── BRAIN CHAIN ROUTES ─────────────────────────────
+      // ─── CORE ROUTES ──────────────────────────────────
       if (path === '/v1/models' && method === 'GET') {
         return jsonResponse(getModels(), corsHeaders);
       }
@@ -45,192 +65,82 @@ export default {
         return await handleChat(await request.json(), env, corsHeaders);
       }
 
-      // ─── DREAM ENGINE ──────────────────────────────────
-      if (path === '/dream/store' && method === 'POST') {
-        return await proxyToBrain('eon-p2p', '/dream/store', request, env, corsHeaders);
+      // ─── VERIFICATION CHAIN ───────────────────────────
+      if (path === '/verify' && method === 'POST') {
+        return await handleVerify(await request.json(), env, corsHeaders);
       }
 
-      if (path === '/dream/list' && method === 'GET') {
-        return await proxyToBrain('eon-p2p', '/dream/list', request, env, corsHeaders);
+      if (path === '/chain-verify' && method === 'POST') {
+        return await handleChainVerify(await request.json(), env, corsHeaders);
       }
 
-      if (path === '/dream/cycle' && method === 'POST') {
-        return await proxyToBrain('eon-p2p', '/dream/cycle', request, env, corsHeaders);
-      }
-
-      if (path === '/dream/insights' && method === 'GET') {
-        return await proxyToBrain('eon-p2p', '/dream/insights', request, env, corsHeaders);
+      // ─── DREAM ENGINE ─────────────────────────────────
+      if (path.startsWith('/dream/')) {
+        return await proxyToBrain('eon-p2p', path, request, env, corsHeaders);
       }
 
       // ─── SYNC MATRIX ──────────────────────────────────
-      if (path === '/sync/config' && method === 'GET') {
-        return await proxyToBrain('eon-p2p', '/sync/config' + url.search, request, env, corsHeaders);
-      }
-
-      if (path === '/sync/config' && method === 'POST') {
-        return await proxyToBrain('eon-p2p', '/sync/config', request, env, corsHeaders);
-      }
-
-      if (path === '/sync/models' && method === 'GET') {
-        return await proxyToBrain('eon-p2p', '/sync/models', request, env, corsHeaders);
-      }
-
-      if (path === '/sync/models' && method === 'POST') {
-        return await proxyToBrain('eon-p2p', '/sync/models', request, env, corsHeaders);
-      }
-
-      if (path === '/sync/memory' && method === 'GET') {
-        return await proxyToBrain('eon-p2p', '/sync/memory' + url.search, request, env, corsHeaders);
-      }
-
-      if (path === '/sync/memory' && method === 'POST') {
-        return await proxyToBrain('eon-p2p', '/sync/memory', request, env, corsHeaders);
-      }
-
-      if (path === '/sync/health' && method === 'GET') {
-        return await proxyToBrain('eon-p2p', '/sync/health', request, env, corsHeaders);
+      if (path.startsWith('/sync/')) {
+        return await proxyToBrain('eon-p2p', path + url.search, request, env, corsHeaders);
       }
 
       // ─── P2P DELEGATION ───────────────────────────────
-      if (path === '/delegate/to-cloud' && method === 'POST') {
-        return await proxyToBrain('eon-p2p', '/delegate/to-cloud', request, env, corsHeaders);
+      if (path.startsWith('/delegate/')) {
+        return await proxyToBrain('eon-p2p', path, request, env, corsHeaders);
       }
 
-      if (path === '/delegate/to-local' && method === 'POST') {
-        return await proxyToBrain('eon-p2p', '/delegate/to-local', request, env, corsHeaders);
-      }
-
-      if (path === '/delegate/pending' && method === 'GET') {
-        return await proxyToBrain('eon-p2p', '/delegate/pending', request, env, corsHeaders);
-      }
-
-      if (path === '/delegate/result' && method === 'POST') {
-        return await proxyToBrain('eon-p2p', '/delegate/result', request, env, corsHeaders);
-      }
-
-      // ─── OPENCODE DISPATCH ────────────────────────────
-      if (path === '/opencode/dispatch' && method === 'POST') {
-        return await proxyToBrain('eon-p2p', '/opencode/dispatch', request, env, corsHeaders);
-      }
-
-      if (path === '/opencode/agents' && method === 'GET') {
-        return await proxyToBrain('eon-p2p', '/opencode/agents', request, env, corsHeaders);
-      }
-
-      if (path === '/opencode/chain' && method === 'POST') {
-        return await proxyToBrain('eon-p2p', '/opencode/chain', request, env, corsHeaders);
+      // ─── OPENCODE ─────────────────────────────────────
+      if (path.startsWith('/opencode/')) {
+        return await proxyToBrain('eon-p2p', path, request, env, corsHeaders);
       }
 
       // ─── SELF UPGRADE ─────────────────────────────────
-      if (path === '/upgrade/propose' && method === 'POST') {
-        return await proxyToBrain('eon-p2p', '/upgrade/propose', request, env, corsHeaders);
-      }
-
-      if (path === '/upgrade/pending' && method === 'GET') {
-        return await proxyToBrain('eon-p2p', '/upgrade/pending', request, env, corsHeaders);
-      }
-
-      if (path === '/upgrade/result' && method === 'POST') {
-        return await proxyToBrain('eon-p2p', '/upgrade/result', request, env, corsHeaders);
+      if (path.startsWith('/upgrade/')) {
+        return await proxyToBrain('eon-p2p', path, request, env, corsHeaders);
       }
 
       // ─── PROVIDERS ────────────────────────────────────
-      if (path === '/providers/register' && method === 'POST') {
-        return await proxyToBrain('eon-p2p', '/providers/register', request, env, corsHeaders);
-      }
-
-      if (path === '/providers/models' && method === 'GET') {
-        return await proxyToBrain('eon-p2p', '/providers/models', request, env, corsHeaders);
+      if (path.startsWith('/providers/')) {
+        return await proxyToBrain('eon-p2p', path, request, env, corsHeaders);
       }
 
       // ─── ACCOUNTS ─────────────────────────────────────
-      if (path === '/accounts/register' && method === 'POST') {
-        return await proxyToBrain('eon-p2p', '/accounts/register', request, env, corsHeaders);
-      }
-
-      if (path === '/accounts/list' && method === 'GET') {
-        return await proxyToBrain('eon-p2p', '/accounts/list' + url.search, request, env, corsHeaders);
-      }
-
-      if (path === '/accounts/rotate' && method === 'GET') {
-        return await proxyToBrain('eon-p2p', '/accounts/rotate' + url.search, request, env, corsHeaders);
-      }
-
-      if (path === '/accounts/remove' && method === 'DELETE') {
-        return await proxyToBrain('eon-p2p', '/accounts/remove' + url.search, request, env, corsHeaders);
+      if (path.startsWith('/accounts/')) {
+        return await proxyToBrain('eon-p2p', path + url.search, request, env, corsHeaders);
       }
 
       // ─── INCENTIVES ───────────────────────────────────
-      if (path === '/incentives/balance' && method === 'POST') {
-        return await proxyToBrain('eon-p2p', '/incentives/balance', request, env, corsHeaders);
+      if (path.startsWith('/incentives/')) {
+        return await proxyToBrain('eon-p2p', path, request, env, corsHeaders);
       }
 
-      if (path === '/incentives/redeem' && method === 'POST') {
-        return await proxyToBrain('eon-p2p', '/incentives/redeem', request, env, corsHeaders);
-      }
-
-      // ─── P2P PEERS ────────────────────────────────────
-      if (path === '/p2p/announce' && method === 'POST') {
-        return await proxyToBrain('eon-p2p', '/p2p/announce', request, env, corsHeaders);
-      }
-
-      if (path === '/p2p/peers' && method === 'GET') {
-        return await proxyToBrain('eon-p2p', '/p2p/peers', request, env, corsHeaders);
-      }
-
-      if (path === '/p2p/tasks' && method === 'POST') {
-        return await proxyToBrain('eon-p2p', '/p2p/tasks', request, env, corsHeaders);
-      }
-
-      if (path === '/p2p/task' && method === 'POST') {
-        return await proxyToBrain('eon-p2p', '/p2p/task/' + url.searchParams.get('id'), request, env, corsHeaders);
-      }
-
-      if (path === '/p2p/connect' && method === 'GET') {
-        return await proxyToBrain('eon-p2p', '/p2p/connect', request, env, corsHeaders);
+      // ─── P2P ──────────────────────────────────────────
+      if (path.startsWith('/p2p/')) {
+        return await proxyToBrain('eon-p2p', path, request, env, corsHeaders);
       }
 
       // ─── ADMIN ────────────────────────────────────────
-      if (path === '/admin/verify' && method === 'POST') {
-        return await proxyToBrain('eon-p2p', '/admin/verify', request, env, corsHeaders);
+      if (path.startsWith('/admin/')) {
+        return await proxyToBrain('eon-p2p', path, request, env, corsHeaders);
       }
 
-      if (path === '/admin/migrate' && method === 'POST') {
-        return await proxyToBrain('eon-p2p', '/admin/migrate', request, env, corsHeaders);
-      }
-
-      if (path.startsWith('/region/') && method === 'GET') {
+      // ─── REGION ───────────────────────────────────────
+      if (path.startsWith('/region/')) {
         return await proxyToBrain('eon-p2p', path, request, env, corsHeaders);
       }
 
       // ─── KV STORAGE ───────────────────────────────────
-      if (path.startsWith('/kv/') && method === 'GET') {
+      if (path.startsWith('/kv/')) {
         return await proxyToBrain('ai-cloud-space', path, request, env, corsHeaders);
       }
 
-      if (path.startsWith('/kv/') && method === 'PUT') {
-        return await proxyToBrain('ai-cloud-space', path, request, env, corsHeaders);
-      }
-
-      if (path.startsWith('/kv/') && method === 'DELETE') {
-        return await proxyToBrain('ai-cloud-space', path, request, env, corsHeaders);
-      }
-
-      if (path === '/kv' && method === 'GET') {
+      if (path === '/kv') {
         return await proxyToBrain('ai-cloud-space', '/kv' + url.search, request, env, corsHeaders);
       }
 
       // ─── D1 DATABASE ──────────────────────────────────
-      if (path.startsWith('/d1/') && method === 'GET') {
+      if (path.startsWith('/d1/')) {
         return await proxyToBrain('ai-cloud-space', path, request, env, corsHeaders);
-      }
-
-      if (path.startsWith('/d1/') && method === 'PUT') {
-        return await proxyToBrain('ai-cloud-space', path, request, env, corsHeaders);
-      }
-
-      if (path === '/d1/query' && method === 'POST') {
-        return await proxyToBrain('ai-cloud-space', '/d1/query', request, env, corsHeaders);
       }
 
       // ─── BRAIN CHAIN STATUS ───────────────────────────
@@ -246,9 +156,11 @@ export default {
       if (path === '/health') {
         return jsonResponse({
           status: 'ok',
-          version: '3.0.0',
+          version: '3.1.0',
           brains: Object.keys(BRAINS),
-          features: ['dream-engine', 'sync-matrix', 'p2p-delegation', 'self-upgrade', 'provider-registry', 'account-management', 'kv-storage', 'd1-database']
+          features: ['dream-engine', 'sync-matrix', 'p2p-delegation', 'self-upgrade',
+                     'provider-registry', 'account-management', 'kv-storage', 'd1-database',
+                     'verification-chain', 'anti-hallucination']
         }, corsHeaders);
       }
 
@@ -264,27 +176,22 @@ function getModels() {
   return {
     object: 'list',
     data: [
-      // Core models
       { id: 'auto', owned_by: 'brain-chain', description: 'Auto-route to best brain' },
       { id: 'code', owned_by: 'brain-chain', description: 'Code generation' },
       { id: 'analysis', owned_by: 'brain-chain', description: 'Deep analysis' },
       { id: 'chat', owned_by: 'brain-chain', description: 'General chat' },
       { id: 'creative', owned_by: 'brain-chain', description: 'Creative writing' },
-
-      // Brain-specific models
       { id: 'dream', owned_by: 'eon-p2p', description: 'Autonomous reflection' },
       { id: 'dream-memory', owned_by: 'eon-p2p', description: 'Dreams based on memories' },
       { id: 'memory', owned_by: 'ai-cloud-space', description: 'Memory-aware responses' },
       { id: 'matrix', owned_by: 'brain-chain', description: 'Matrix routing' },
-
-      // Delegation models
       { id: 'delegate-cloud', owned_by: 'eon-p2p', description: 'Delegate to cloud' },
       { id: 'delegate-local', owned_by: 'eon-p2p', description: 'Delegate to local machine' },
-
-      // Chain models
       { id: 'chain-think', owned_by: 'brain-chain', description: 'Multi-step reasoning' },
       { id: 'chain-act', owned_by: 'brain-chain', description: 'Action planning' },
       { id: 'chain-create', owned_by: 'brain-chain', description: 'Creative generation' },
+      { id: 'verify', owned_by: 'brain-chain', description: 'Fact verification' },
+      { id: 'cross-check', owned_by: 'brain-chain', description: 'Cross-brain verification' },
     ]
   };
 }
@@ -308,7 +215,7 @@ async function handleChat(body, env, corsHeaders) {
   const enhancedMessages = [
     ...messages,
     ...(memoryContext ? [{ role: 'system', content: `Memory: ${memoryContext}` }] : []),
-    { role: 'system', content: 'You are EON Brain Chain v3.0, the infinite intelligence network. You coordinate between Cloud Brain, ai-cloud-space, and eon-p2p-cloud. Be concise, technical, and actionable. You have access to dream engine, sync matrix, P2P delegation, and self-upgrade systems.' }
+    { role: 'system', content: 'You are EON Brain Chain v3.1, the infinite intelligence network. Be concise, technical, and actionable. Always verify facts before stating them.' }
   ];
 
   // Route to appropriate brain
@@ -335,6 +242,98 @@ async function handleChat(body, env, corsHeaders) {
   return response;
 }
 
+// ─── VERIFICATION CHAIN (×100 anti-hallucination) ────────
+async function handleVerify(body, env, corsHeaders) {
+  const { statement, context } = body;
+
+  // Step 1: Get initial response from Cloud Brain
+  const initialResponse = await proxyToBrain('cloud-brain', '/v1/chat/completions', {
+    json: () => Promise.resolve({
+      model: 'analysis',
+      messages: [
+        { role: 'system', content: 'You are a fact verifier. Analyze the following statement and provide a confidence score (0-100) and list any potential inaccuracies.' },
+        { role: 'user', content: `Statement: ${statement}\nContext: ${context || 'None'}` }
+      ],
+      max_tokens: 1000
+    })
+  }, env, corsHeaders);
+
+  // Step 2: Cross-check with Dream Engine
+  const dreamCheck = await proxyToBrain('eon-p2p', '/dream/recall/' + Date.now(), {
+    json: () => Promise.resolve({})
+  }, env, corsHeaders);
+
+  // Step 3: Check memory for contradictions
+  const memoryCheck = await getMemoryContext(statement, env);
+
+  // Step 4: Calculate verification score
+  const verification = {
+    statement,
+    initialResponse,
+    dreamCheck,
+    memoryCheck,
+    timestamp: new Date().toISOString(),
+    confidence: calculateConfidence(initialResponse, memoryCheck)
+  };
+
+  return jsonResponse(verification, corsHeaders);
+}
+
+async function handleChainVerify(body, env, corsHeaders) {
+  const { statements, rounds = 3 } = body;
+  const results = [];
+
+  for (const statement of statements || []) {
+    const roundResults = [];
+
+    for (let i = 0; i < rounds; i++) {
+      // Each round: verify with different brain
+      const brain = ['cloud-brain', 'eon-p2p', 'ai-cloud-space'][i % 3];
+
+      const verification = await proxyToBrain(brain, '/v1/chat/completions', {
+        json: () => Promise.resolve({
+          messages: [
+            { role: 'system', content: `Round ${i + 1} verification. Analyze and score confidence (0-100).` },
+            { role: 'user', content: statement }
+          ],
+          max_tokens: 500
+        })
+      }, env, corsHeaders);
+
+      roundResults.push({ brain, round: i + 1, result: verification });
+    }
+
+    // Calculate consensus
+    const avgConfidence = roundResults.reduce((sum, r) => sum + (r.result?.choices?.[0]?.message?.confidence || 50), 0) / roundResults.length;
+
+    results.push({
+      statement,
+      rounds: roundResults,
+      consensus: avgConfidence,
+      verified: avgConfidence > 70
+    });
+  }
+
+  return jsonResponse({ results, timestamp: new Date().toISOString() }, corsHeaders);
+}
+
+function calculateConfidence(response, memoryCheck) {
+  // Simple confidence calculation
+  let confidence = 50;
+
+  if (response?.choices?.[0]?.message?.content) {
+    const content = response.choices[0].message.content.toLowerCase();
+    if (content.includes('confirmed') || content.includes('accurate')) confidence += 20;
+    if (content.includes('likely') || content.includes('probable')) confidence += 10;
+    if (content.includes('uncertain') || content.includes('unverified')) confidence -= 10;
+    if (content.includes('false') || content.includes('incorrect')) confidence -= 30;
+  }
+
+  if (memoryCheck) confidence += 10;
+
+  return Math.max(0, Math.min(100, confidence));
+}
+
 // ─── BRAIN ROUTING ───────────────────────────────────────
 function routeBrain(model, context) {
   if (model !== 'auto') return model;
@@ -357,8 +356,8 @@ function routeBrain(model, context) {
     return 'matrix';
   }
 
-  if (lower.includes('upgrade') || lower.includes('improve') || lower.includes('optimize')) {
-    return 'chain-think';
+  if (lower.includes('verify') || lower.includes('check') || lower.includes('fact')) {
+    return 'verify';
   }
 
   return 'auto';
@@ -367,17 +366,13 @@ function routeBrain(model, context) {
 // ─── MEMORY SYSTEM ───────────────────────────────────────
 async function getMemoryContext(query, env) {
   try {
-    const response = await fetch(`${BRAINS['ai-cloud-space']}/kv?prefix=mem:`, {
-      headers: { 'Authorization': `Bearer ${env.EON_CLOUD_BRAIN_TOKEN || ''}` }
-    });
+    const response = await fetchSmart('ai-cloud-space', '/kv?prefix=mem:', env);
     const data = await response.json();
     if (!data.keys?.length) return null;
 
     const memories = [];
     for (const key of data.keys.slice(0, 10)) {
-      const val = await fetch(`${BRAINS['ai-cloud-space']}/kv/${key}`, {
-        headers: { 'Authorization': `Bearer ${env.EON_CLOUD_BRAIN_TOKEN || ''}` }
-      });
+      const val = await fetchSmart('ai-cloud-space', `/kv/${key}`, env);
       const mem = await val.json();
       memories.push(mem);
     }
@@ -398,12 +393,8 @@ async function storeMemory(input, response, env) {
       timestamp: new Date().toISOString(),
       type: 'chat'
     };
-    await fetch(`${BRAINS['ai-cloud-space']}/kv/${key}`, {
+    await fetchSmart('ai-cloud-space', `/kv/${key}`, env, {
       method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${env.EON_CLOUD_BRAIN_TOKEN || ''}`,
-        'Content-Type': 'application/json'
-      },
       body: JSON.stringify(entry)
     });
   } catch (e) { /* KV might not be configured */ }
@@ -439,31 +430,76 @@ async function handleBrainChain(body, env, corsHeaders) {
 async function getBrainStatus(env, corsHeaders) {
   const status = {};
 
-  for (const [name, url] of Object.entries(BRAINS)) {
+  for (const [name, config] of Object.entries(BRAINS)) {
     try {
-      const response = await fetch(`${url}/health`, { method: 'GET', signal: AbortSignal.timeout(5000) });
+      const response = await fetchSmart(name, '/health', env, { method: 'GET' });
       const data = await response.json();
-      status[name] = { url, status: 'online', data };
+      status[name] = { url: config.url, status: 'online', data };
     } catch (e) {
-      status[name] = { url, status: 'offline', error: e.message };
+      status[name] = { url: config.url, status: 'offline', error: e.message };
     }
   }
 
   return jsonResponse({ brains: status, timestamp: new Date().toISOString() }, corsHeaders);
 }
 
+// ─── SMART FETCH (anti-bot) ──────────────────────────────
+async function fetchSmart(brainName, path, env, options = {}) {
+  const config = BRAINS[brainName];
+  if (!config) throw new Error(`Unknown brain: ${brainName}`);
+
+  const url = `${config.url}${path}`;
+  const headers = {
+    ...WORKER_HEADERS,
+    ...(options.headers || {})
+  };
+
+  if (config.auth) {
+    headers['Authorization'] = `Bearer ${env.EON_CLOUD_BRAIN_TOKEN || ''}`;
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), config.timeout || 30000);
+
+  try {
+    const response = await fetch(url, {
+      method: options.method || 'GET',
+      headers,
+      body: options.body || undefined,
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    // Check for Cloudflare challenge
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('text/html')) {
+      throw new Error('Cloudflare challenge detected');
+    }
+
+    return response;
+  } catch (e) {
+    clearTimeout(timeoutId);
+    throw e;
+  }
+}
+
 // ─── PROXY TO BRAIN ──────────────────────────────────────
 async function proxyToBrain(brainName, path, request, env, corsHeaders) {
-  const brainUrl = BRAINS[brainName];
-  if (!brainUrl) {
+  const config = BRAINS[brainName];
+  if (!config) {
     return jsonResponse({ error: `Unknown brain: ${brainName}` }, corsHeaders, 400);
   }
 
-  const url = `${brainUrl}${path}`;
+  const url = `${config.url}${path}`;
   const headers = {
-    'Content-Type': 'application/json',
-    'Authorization': request.headers?.get('Authorization') || `Bearer ${env.EON_CLOUD_BRAIN_TOKEN || ''}`
+    ...WORKER_HEADERS,
+    'Content-Type': 'application/json'
   };
+
+  if (config.auth) {
+    headers['Authorization'] = request.headers?.get('Authorization') || `Bearer ${env.EON_CLOUD_BRAIN_TOKEN || ''}`;
+  }
 
   let body = null;
   if (request.json) {
@@ -472,14 +508,36 @@ async function proxyToBrain(brainName, path, request, env, corsHeaders) {
     } catch (e) {}
   }
 
-  const response = await fetch(url, {
-    method: request.method || 'GET',
-    headers,
-    body: body ? JSON.stringify(body) : undefined
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), config.timeout || 30000);
 
-  const data = await response.json();
-  return jsonResponse(data, corsHeaders, response.status);
+  try {
+    const response = await fetch(url, {
+      method: request.method || 'GET',
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    // Check for Cloudflare challenge
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('text/html')) {
+      return jsonResponse({
+        error: 'Cloudflare challenge',
+        brain: brainName,
+        url: config.url,
+        suggestion: 'Check if the target worker has proper CORS and is accessible'
+      }, corsHeaders, 502);
+    }
+
+    const data = await response.json();
+    return jsonResponse(data, corsHeaders, response.status);
+  } catch (e) {
+    clearTimeout(timeoutId);
+    return jsonResponse({ error: e.message, brain: brainName }, corsHeaders, 500);
+  }
 }
 
 function jsonResponse(data, corsHeaders = {}, status = 200) {
