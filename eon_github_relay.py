@@ -18,7 +18,7 @@ try:
 except:
     pass
 if not GITHUB_TOKEN:
-    GITHUB_TOKEN = "${GITHUB_TOKEN}"
+    GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 
 REPO = "didicola/eon-cloud-agent"
 BRANCH = "main"
@@ -135,18 +135,39 @@ def run_listener():
                     continue
                 lines = content.split("\n")
                 from_machine = lines[0].replace("FROM: ", "") if lines[0].startswith("FROM:") else ""
+                
+                # Check for CMD: format (direct shell command)
                 cmd_line = [l for l in lines if l.startswith("CMD: ")]
-                if not cmd_line:
-                    continue
-                cmd = cmd_line[0].replace("CMD: ", "")
-                if from_machine == MACHINE_ID:
-                    processed.add(cmd_file)
-                    continue
+                
+                if cmd_line:
+                    # Shell command format
+                    cmd = cmd_line[0].replace("CMD: ", "")
+                    if from_machine == MACHINE_ID:
+                        processed.add(cmd_file)
+                        continue
+                    print(f"\nCOMMAND from {from_machine}: {cmd}", flush=True)
+                    output = execute_command(cmd)
+                    print(f"Output: {output[:200]}", flush=True)
+                    write_response(cmd_file, output)
+                else:
+                    # Freeform request format (evolution, AI prompt, etc.)
+                    if from_machine == MACHINE_ID:
+                        processed.add(cmd_file)
+                        continue
+                    print(f"\nREQUEST from {from_machine}: {content[:100]}", flush=True)
+                    # Store in dream engine
+                    try:
+                        title = [l for l in lines if 'REQUEST' in l or 'EVOLUTION' in l or 'PRIORITY' in l]
+                        title = title[0][:80] if title else content[:80]
+                        sys.path.insert(0, os.path.expanduser("~"))
+                        from eon_mega_brain import dream_store
+                        dream_store(title.strip(), content[:2000], ['github-relay', 'request', from_machine])
+                        output = f"Stored as dream: {title.strip()}"
+                    except Exception as e:
+                        output = f"Dream store error: {e}"
+                    print(f"Output: {output}", flush=True)
+                    write_response(cmd_file, output)
 
-                print(f"\nCOMMAND from {from_machine}: {cmd}", flush=True)
-                output = execute_command(cmd)
-                print(f"Output: {output[:200]}", flush=True)
-                write_response(cmd_file, output)
                 processed.add(cmd_file)
 
             time.sleep(POLL_INTERVAL)
