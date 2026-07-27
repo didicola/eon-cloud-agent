@@ -4,7 +4,7 @@ EON Telegram Brain — Live AI Chat Bot
 Routes messages through Universal AI Brain v5.0
 Fallback between workers, handles errors gracefully
 """
-import urllib.request, json, os, sys, time, traceback
+import urllib.request, json, os, sys, time, traceback, socket, ssl
 
 sys.path.insert(0, os.path.expanduser("~"))
 from eon_mega_brain import call_worker, WORKERS, VERSION, chat
@@ -36,12 +36,14 @@ def route_robust(prompt):
     """Route with automatic fallback between workers"""
     workers_to_try = [
         ('cloud-brain', 'cloud-brain-proxy/sovereign-cloud'),
+        ('cloud-brain', 'cloud-brain-proxy/sovereign-cloud'),  # retry with fresh call
         ('eon-p2p', 'mistral-small'),
         ('eon-p2p', 'llama-3.3-70b'),
-        ('cloud-brain', 'cloud-brain-proxy/sovereign-cloud'),
+        ('eon-p2p', 'qwen-coder'),
     ]
     
     last_error = None
+    rebalance_count = 0
     for worker, model in workers_to_try:
         try:
             r = call_worker(worker, '/v1/chat/completions', 'POST', {
@@ -49,6 +51,15 @@ def route_robust(prompt):
                 'messages': [{'role': 'user', 'content': prompt}],
                 'max_tokens': 2000
             })
+            content_raw = str(r)[:500]
+            
+            # Detect "rebalancing" error
+            if 'rebalancing' in content_raw.lower() or 'retry shortly' in content_raw.lower():
+                rebalance_count += 1
+                last_error = f"rebalancing (attempt {rebalance_count})"
+                time.sleep(2)
+                continue
+            
             if 'choices' in r:
                 content = r['choices'][0]['message']['content']
                 if content and len(content) > 10:
@@ -105,20 +116,37 @@ def handle_message(text):
     response, used_worker = route_robust(text)
     return response
 
+def get_updates(offset, timeout=30):
+    """Get Telegram updates using raw sockets (avoid urllib timeout issues)"""
+    ctx = ssl.create_default_context()
+    try:
+        with socket.create_connection(('api.telegram.org', 443), timeout=timeout+5) as sock:
+            with ctx.wrap_socket(sock, server_hostname='api.telegram.org') as ssock:
+                path = f'/bot{BOT_TOKEN}/getUpdates?offset={offset}&timeout={timeout}'
+                req = f'GET {path} HTTP/1.1\r\nHost: api.telegram.org\r\nConnection: close\r\n\r\n'
+                ssock.sendall(req.encode())
+                resp = b''
+                while True:
+                    chunk = ssock.read(4096)
+                    if not chunk: break
+                    resp += chunk
+                body = resp.decode(errors='replace').split('\r\n\r\n', 1)[1]
+                return json.loads(body)
+    except Exception as e:
+        return {'ok': False, 'error': str(e)[:100], 'result': []}
+
 def poll_loop():
     global LAST_UPDATE
     print(f"🧠 EON Telegram Brain v{VERSION} — {MACHINE.upper()}")
     print(f"   Bot: @Ririmobot")
-    print(f"   Poll: {POLL_TIMEOUT}s")
+    print(f"   Poll: {POLL_TIMEOUT}s (raw sockets)")
     print("=" * 50)
     sys.stdout.flush()
     
     while True:
         try:
             offset = LAST_UPDATE + 1
-            url = f"https://api.telegram.org/bot{BOT_TOKEN}/getUpdates?offset={offset}&timeout={POLL_TIMEOUT}"
-            with urllib.request.urlopen(url, timeout=POLL_TIMEOUT+5) as r:
-                data = json.loads(r.read())
+            data = get_updates(offset, POLL_TIMEOUT)
             
             for u in data.get('result', []):
                 LAST_UPDATE = u['update_id']
