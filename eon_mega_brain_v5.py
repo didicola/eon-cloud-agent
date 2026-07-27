@@ -27,6 +27,8 @@ CLOUD_BRAIN_TOKEN = os.environ.get('EON_CLOUD_BRAIN_TOKEN', 'Pi6LNVeqGU_G4YEAxNH
 
 # ─── Call Worker ──────────────────────────────────────────────
 def call_worker(name, path, method='GET', data=None, timeout=None):
+    if name == 'local':
+        return handle_local(data)
     c = WORKERS.get(name)
     if not c: return {'error': f'Unknown: {name}'}
     url = f"{c['url']}{path}"
@@ -41,6 +43,19 @@ def call_worker(name, path, method='GET', data=None, timeout=None):
             except: return {'raw': raw[:500], 'status': 'text'}
     except Exception as e:
         return {'error': str(e)[:200]}
+
+def handle_local(data):
+    """Handle local tool execution requests"""
+    if not data: return {'error': 'no data'}
+    messages = data.get('messages', [])
+    prompt = messages[-1].get('content', '') if messages else ''
+    tool_name, tool_args = detect_tool_intent(prompt)
+    if tool_name:
+        result = run_tool(tool_name, tool_args)
+        return {'choices': [{'message': {'role': 'assistant', 'content': f"[tool:{tool_name}] {result[:2000]}"}}], 'usage': {}}
+    else:
+        out = run_tool('shell', prompt[:500])
+        return {'choices': [{'message': {'role': 'assistant', 'content': f"[local] {out[:2000]}"}}], 'usage': {}}
 
 # ─── CLI Tools Auto-Discovery (lazy, not at module level) ────
 _KNOWN_CLIS = ['python3','node','git','curl','jq','pip3','ssh','docker','sqlite3']  # safe --version
@@ -148,7 +163,11 @@ def route_task(prompt, model='auto'):
     if any(w in lower for w in ['reason', 'think', 'logic', 'math']): return 'eon-p2p', 'deepseek-r1'
     if any(w in lower for w in ['fast', 'quick', 'simple', 'hi', 'hello', 'ok']): return 'eon-p2p', 'mistral-small'
     if any(w in lower for w in ['verify', 'check', 'fact', 'confirm']): return 'cloud-brain', 'cloud-brain-proxy/sovereign-cloud'
-    if any(w in lower for w in ['tool', 'shell', 'bash', 'run', 'execute', 'opencode']): return 'local', 'tool-executor'
+    if any(w in lower for w in ['tool', 'shell', 'bash', 'run', 'execute']):
+        # Check if it's a tool request vs asking about tools
+        if any(w in lower for w in [' can you', 'what ', 'list', 'available', 'have']):
+            return 'cloud-brain', 'cloud-brain-proxy/sovereign-cloud'
+        return 'local', 'tool-executor'
     return 'cloud-brain', 'cloud-brain-proxy/sovereign-cloud'
 
 def detect_tool_intent(prompt):
@@ -503,9 +522,17 @@ if __name__ == '__main__':
 
     if is_chat or is_explain:
         args_clean = [a for a in args if a not in ('--chat', '-c', '--explain', '-e')]
-        m = args_clean[0] if args_clean and not args_clean[0].startswith('-') else 'auto'
-        t = 4000
-        run_chat(m, t, explain=is_explain)
+        if args_clean:
+            # Single-shot mode: treat remaining args as prompt
+            prompt = ' '.join(args_clean)
+            r = chat(prompt, 'auto', 4000, explain_mode=is_explain)
+            c = r.get('response', '')
+            if isinstance(c, dict): c = c.get('choices', [{}])[0].get('message', {}).get('content', '')
+            print(f"[{r['worker']}/{r['model']}]")
+            print(c)
+        else:
+            # Interactive continuation chat mode
+            run_chat('auto', 4000, explain=is_explain)
 
     elif args and args[0] == 'version':
         sub = args[1] if len(args) > 1 else 'list'
