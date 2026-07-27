@@ -9,7 +9,7 @@ import urllib.request, json, os, sys, time, hashlib, sqlite3, threading
 BOT_TOKEN = "8940974811:AAE4faGkCGl-6oFU3YG8h2_oGTIJ_GrBbow"
 CHAT_ID = "6663994526"
 CLOUD_URL = "https://cloud-brain-proxy.exportdefaultasyncfetchrequestenvconsturl.workers.dev/v1/chat/completions"
-CLOUD_TOKEN = "Pi6LNVeqGU_G4YEAxNHyXhczNqRjsmBuzTNt343PQtI"
+CLOUD_TOKEN = os.environ.get("EON_CLOUD_BRAIN_TOKEN", "")
 GITHUB_REPO = "didicola/eon-cloud-agent"
 
 MACHINE_ID = os.environ.get("EON_MACHINE_ID", "termux")

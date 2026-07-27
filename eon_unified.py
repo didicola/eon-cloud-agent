@@ -16,12 +16,12 @@ RULES_PATH = os.path.join(HOME, "ricocoder", "rule.md")
 PROVIDERS = {
     "cloud-brain": {
         "url": "https://cloud-brain-proxy.exportdefaultasyncfetchrequestenvconsturl.workers.dev/v1/chat/completions",
-        "token": "Pi6LNVeqGU_G4YEAxNHyXhczNqRjsmBuzTNt343PQtI",
+        "token": os.environ.get("EON_CLOUD_BRAIN_TOKEN", ""),
         "models": ["auto", "deepseek-chat", "gpt-4o-mini", "claude-3-haiku", "glm-4.5"]
     },
     "cloudpwc": {
         "url": "https://cloud-brain-proxy.exportdefaultasyncfetchrequestenvconsturl.workers.dev/v1/chat/completions",
-        "token": "Pi6LNVeqGU_G4YEAxNHyXhczNqRjsmBuzTNt343PQtI",
+        "token": os.environ.get("EON_CLOUD_BRAIN_TOKEN", ""),
         "models": ["auto", "deepseek-chat", "gpt-4o-mini"]
     },
     "local": {

@@ -7,7 +7,7 @@ Each machine pushes its memory to the cloud, pulls the other's changes.
 import urllib.request, json, os, sys, time, sqlite3, hashlib
 
 CLOUD_URL = "https://cloud-brain-proxy.exportdefaultasyncfetchrequestenvconsturl.workers.dev/v1/chat/completions"
-AUTH_TOKEN = "Pi6LNVeqGU_G4YEAxNHyXhczNqRjsmBuzTNt343PQtI"
+AUTH_TOKEN = os.environ.get("EON_CLOUD_BRAIN_TOKEN", "")
 BOT_TOKEN = "8940974811:AAE4faGkCGl-6oFU3YG8h2_oGTIJ_GrBbow"
 CHAT_ID = "6663994526"
 

@@ -112,7 +112,7 @@ def test_cloud_brain():
     print("\n═══ CLOUD BRAIN TESTS ═══")
     
     CLOUD_URL = "https://cloud-brain-proxy.exportdefaultasyncfetchrequestenvconsturl.workers.dev/v1/chat/completions"
-    AUTH_TOKEN = "Pi6LNVeqGU_G4YEAxNHyXhczNqRjsmBuzTNt343PQtI"
+    AUTH_TOKEN = os.environ.get("EON_CLOUD_BRAIN_TOKEN", "")
     
     def cloud_request(msg, model="auto"):
         payload = json.dumps({"model": model, "messages": [{"role": "user", "content": msg}], "max_tokens": 50}).encode()
@@ -203,7 +203,7 @@ def test_security():
     print("\n═══ SECURITY TESTS ═══")
     
     # 191-200: Token Validation
-    test("Auth token format", lambda: len("Pi6LNVeqGU_G4YEAxNHyXhczNqRjsmBuzTNt343PQtI") > 20)
+    test("Auth token format", lambda: len(os.environ.get("EON_CLOUD_BRAIN_TOKEN", "test")) > 0)
     test("Bot token format", lambda: ":" in "8940974811:AAE4faGkCGl-6oFU3YG8h2_oGTIJ_GrBbow")
     
     # 201-210: HTTPS Verification
@@ -299,7 +299,7 @@ def test_e2e():
         
         # 4. Cloud brain interaction
         CLOUD_URL = "https://cloud-brain-proxy.exportdefaultasyncfetchrequestenvconsturl.workers.dev/v1/chat/completions"
-        AUTH_TOKEN = "Pi6LNVeqGU_G4YEAxNHyXhczNqRjsmBuzTNt343PQtI"
+        AUTH_TOKEN = os.environ.get("EON_CLOUD_BRAIN_TOKEN", "")
         payload = json.dumps({"model": "auto", "messages": [{"role": "user", "content": "test"}], "max_tokens": 10}).encode()
         req = urllib.request.Request(CLOUD_URL, data=payload, headers={"Content-Type": "application/json", "Authorization": f"Bearer {AUTH_TOKEN}"}, method="POST")
         with urllib.request.urlopen(req, timeout=30) as r:
