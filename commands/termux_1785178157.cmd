@@ -1,0 +1,3 @@
+FROM: termux
+TIME: 2026-07-27 18:49:17
+CMD: cd ~/eon-cloud-agent && git pull origin main && cp eon_mega_brain.py /usr/local/bin/eon && chmod +x /usr/local/bin/eon && mkdir -p ~/eon-config && echo '{"version":"4.0-pro-max","tier":"max","billing":"free-forever","ai_intelligence":{"model_routing":"intelligent","auto_failover":true}}' > ~/eon-config/promax.json && export EON_TIER=pro-max && echo 'EON Pro Max upgrade complete' && eon models 2>&1 | head -5 && eon dream-stats 2>&1
