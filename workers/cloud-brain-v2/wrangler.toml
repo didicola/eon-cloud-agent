@@ -1,0 +1,18 @@
+name = "cloud-brain-v2"
+main = "index.js"
+compatibility_date = "2024-01-01"
+
+# KV namespace for memory
+[[kv_namespaces]]
+binding = "EON_KV"
+id = "eon-kv-memory"
+
+# Environment variables
+[vars]
+OPENROUTER_API_KEY = ""
+EON_GITHUB_TOKEN = ""
+EON_MACHINE_ID = "cloud-brain"
+
+# Secrets (set via wrangler secret put)
+# OPENROUTER_API_KEY
+# EON_GITHUB_TOKEN
