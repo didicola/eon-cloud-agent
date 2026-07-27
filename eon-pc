@@ -1,0 +1,11 @@
+#!/bin/bash
+SCRIPT="/root/eon_unified.py"
+VENV="/root/.venv-eon"
+PC_CONF="/root/.proxychains/proxychains.conf"
+if [ -d "$VENV" ]; then source "$VENV/bin/activate" 2>/dev/null; fi
+if [ ! -f "$PC_CONF" ]; then
+    mkdir -p "$(dirname "$PC_CONF")"
+    echo -e "strict_chain\nproxy_dns\ntcp_read_time_out 15000\ntcp_connect_time_out 8000\n\n[ProxyList]\nsocks5 127.0.0.1 9050" > "$PC_CONF"
+fi
+export PROXYCHAINS_CONF_FILE="$PC_CONF"
+proxychains4 -q python3 "$SCRIPT" "$@"

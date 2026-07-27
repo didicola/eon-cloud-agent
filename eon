@@ -1,0 +1,5 @@
+#!/bin/bash
+SCRIPT="/root/eon_unified.py"
+VENV="/root/.venv-eon"
+if [ -d "$VENV" ]; then source "$VENV/bin/activate" 2>/dev/null; fi
+python3 "$SCRIPT" "$@"
