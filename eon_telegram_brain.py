@@ -116,6 +116,25 @@ def handle_message(text):
     response, used_worker = route_robust(text)
     return response
 
+def delete_webhook():
+    """Delete webhook so we can use getUpdates polling"""
+    ctx = ssl.create_default_context()
+    try:
+        with socket.create_connection(('api.telegram.org', 443), timeout=5) as sock:
+            with ctx.wrap_socket(sock, server_hostname='api.telegram.org') as ssock:
+                req = f'GET /bot{BOT_TOKEN}/deleteWebhook HTTP/1.0\r\nHost: api.telegram.org\r\n\r\n'
+                ssock.sendall(req.encode())
+                resp = b''
+                while True:
+                    chunk = ssock.read(4096)
+                    if not chunk: break
+                    resp += chunk
+                raw = resp.decode(errors='replace')
+                body = raw.split('\r\n\r\n', 1)[1]
+                return json.loads(body)
+    except Exception as e:
+        return {'error': str(e)}
+
 def get_updates(offset, timeout=30):
     """Get Telegram updates using raw sockets (avoid urllib timeout issues)"""
     ctx = ssl.create_default_context()
@@ -168,4 +187,6 @@ def poll_loop():
             time.sleep(5)
 
 if __name__ == '__main__':
+    del_result = delete_webhook()
+    print(f"Webhook deleted: {del_result.get('ok', False)}", flush=True)
     poll_loop()
