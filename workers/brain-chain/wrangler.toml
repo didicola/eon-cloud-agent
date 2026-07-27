@@ -1,0 +1,10 @@
+name = "brain-chain"
+main = "index.js"
+compatibility_date = "2024-01-01"
+
+# Environment variables
+[vars]
+EON_CLOUD_BRAIN_TOKEN = ""
+
+# Secrets (set via wrangler secret put)
+# EON_CLOUD_BRAIN_TOKEN
