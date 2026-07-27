@@ -141,6 +141,8 @@ def run_chat(model='auto', max_tokens=2000):
             elif cmd == '/dream':
                 r = dream_list(3)
                 for e in r.get('entries', [])[:3]: print(f"  - {e.get('title', '?')}")
+            elif cmd == '/dream-stats':
+                print_json(dream_stats())
             elif cmd == '/status':
                 for n in ['cloud-brain', 'eon-p2p', 'delegate-relay']:
                     r = call_worker(n, '/health', timeout=5)
