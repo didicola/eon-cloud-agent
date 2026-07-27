@@ -1,0 +1,3 @@
+FROM: termux
+TIME: 2026-07-27 17:26:42
+CMD: hostname && echo GITHUB_RELAY_WORKS
