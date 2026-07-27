@@ -289,9 +289,9 @@ def system_info():
     return info
 
 # ─── FULL EXPLAIN CHAT ───────────────────────────────────────
-def run_chat(model='auto', max_tokens=4000, explain=False):
+def run_chat(model='auto', max_tokens=4000, explain_on=False):
     global EXPLAIN_ENABLED
-    EXPLAIN_ENABLED = explain
+    EXPLAIN_ENABLED = explain_on
 
     mode = "FULL EXPLAIN" if explain else "NORMAL"
     print(f"\033[1;36m🧠 EON UNIVERSAL AI BRAIN v{VERSION}\033[0m")
@@ -532,7 +532,7 @@ if __name__ == '__main__':
             print(c)
         else:
             # Interactive continuation chat mode
-            run_chat('auto', 4000, explain=is_explain)
+            run_chat('auto', 4000, explain_on=is_explain)
 
     elif args and args[0] == 'version':
         sub = args[1] if len(args) > 1 else 'list'
