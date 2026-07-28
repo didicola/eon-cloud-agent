@@ -1,0 +1,14 @@
+name = "eon-cloud-bot"
+main = "index.js"
+compatibility_date = "2024-01-01"
+
+# Cron Trigger — polls Telegram every 30 seconds
+[triggers]
+crons = ["*/1 * * * *"]
+
+# KV Namespace for conversation history + experiences
+# Create with: wrangler kv namespace create EON_KV
+# Then replace the ID below
+[[kv_namespaces]]
+binding = "EON_KV"
+id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
