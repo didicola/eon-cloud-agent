@@ -1,0 +1,12 @@
+[Unit]
+Description=EON Webhook Setup
+After=eon-tunnel.service
+Requires=eon-tunnel.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c 'sleep 15 && URL=$(journalctl -u eon-tunnel --no-pager -n 50 | grep -o "https://[a-z0-9-]*.trycloudflare.com" | tail -1) && if [ -n "$URL" ]; then curl -s "https://api.telegram.org/bot8940974811:AAE4faGkCGl-6oFU3YG8h2_oGTIJ_GrBbow/setWebhook" -X POST -H "Content-Type: application/json" -d "{\"url\":\"${URL}/webhook\",\"max_connections\":40,\"allowed_updates\":[\"message\"]}"; fi'
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

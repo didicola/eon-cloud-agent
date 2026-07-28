@@ -1,0 +1,16 @@
+[Unit]
+Description=EON Cloudflare Tunnel
+After=eon-agi.service
+Requires=eon-agi.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/cloudflared tunnel --url http://localhost:3000 --no-autoupdate
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=eon-tunnel
+
+[Install]
+WantedBy=multi-user.target

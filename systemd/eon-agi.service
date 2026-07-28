@@ -1,0 +1,17 @@
+[Unit]
+Description=EON Quantum AGI Bot Server
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/workers/quantum-bot
+ExecStart=/usr/bin/node api/index.js
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=eon-agi
+
+[Install]
+WantedBy=multi-user.target
