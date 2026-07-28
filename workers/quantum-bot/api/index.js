@@ -1,14 +1,16 @@
 // ═══════════════════════════════════════════════════════════════════════
-// EON AGI v7.0 — 8-Layer Organic Intelligence System
-// Universal Problem Solving | Self-Correction | Recursive Improvement
-// Multi-Reasoning | Goal Alignment | Efficiency | Causal | Uncertainty
-// Plus: Self-Heal | Self-Update | Deep Learning | Mandatory Execute
+// EON AGI v8.0 — 8-Layer Organic Intelligence + Self-Upgrade
+// P0: TF-IDF retrieval, cross-model verify, holdout eval
+// P1: Task-adaptive consensus, CoVe verification, Quality Decay, Tiered memory
+// P2: AAD pre-drafting, early quorum, skill compiler
+// Plus: Self-Heal | Self-Update | Mandatory Execute
 // ═══════════════════════════════════════════════════════════════════════
 const https = require('https');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
+const AGI = require('./agi-upgrade');
 
 // ── Config ──────────────────────────────────────────────────────────
 const BOT_TOKEN = '8940974811:AAE4faGkCGl-6oFU3YG8h2_oGTIJ_GrBbow';
@@ -23,6 +25,12 @@ const EXPERIENCES_FILE = path.join(MEMORY_DIR, 'experiences.json');
 const SCORES_FILE = path.join(MEMORY_DIR, 'scores.json');
 const CAUSAL_FILE = path.join(MEMORY_DIR, 'causal_chains.json');
 const GOALS_FILE = path.join(MEMORY_DIR, 'goals.json');
+const HOLDOUT_FILE = path.join(MEMORY_DIR, 'holdout_evals.json');
+const SKILLS_FILE = path.join(MEMORY_DIR, 'skills.json');
+const QUALITY_FILE = path.join(MEMORY_DIR, 'quality.json');
+const MEMORY_HOT = path.join(MEMORY_DIR, 'hot.json');
+const MEMORY_WARM = path.join(MEMORY_DIR, 'warm.json');
+const MEMORY_COLD = path.join(MEMORY_DIR, 'cold.json');
 const LOG_FILE = '/tmp/quantum-bot.log';
 
 // ── Brain Regions ───────────────────────────────────────────────────
@@ -41,7 +49,9 @@ let stats = {
   errors: 0, uptime: Date.now(), region_calls: {}, sub_agents: 0,
   self_corrections: 0, rsi_improvements: 0, causal_chains: 0,
   memory_hits: 0, memory_misses: 0, confidence_scores: [],
-  strategy_scores: {}, heal_events: 0, mandatory_executes: 0
+  strategy_scores: {}, heal_events: 0, mandatory_executes: 0,
+  cove_verifications: 0, cross_model_verifies: 0, quorum_detections: 0,
+  skills_compiled: 0, holdout_runs: 0
 };
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -151,28 +161,27 @@ function getGoals() {
 // Find similar past tasks, adapt solutions instead of reasoning from scratch
 // ═══════════════════════════════════════════════════════════════════════
 async function layer1_universalProblemSolving(input, intent) {
-  log('think', 'L1: Universal Problem Solving — searching memory...');
-  const similar = findSimilarExperiences(input, 3);
+  log('think', 'L1: Universal Problem Solving — TF-IDF + tiered memory search...');
+  const similar = AGI.tieredSearch(input, 3);  // P1: Tiered memory (hot→warm→cold)
 
-  if (similar.length > 0 && similar[0].score > 0.3) {
+  if (similar.length > 0 && similar[0].score > 0.25) {
     stats.memory_hits++;
-    log('ok', `L1: Found ${similar.length} similar experiences (best: ${(similar[0].score * 100).toFixed(0)}%)`);
-    // Adapt past solution
+    log('ok', `L1: Found ${similar.length} similar experiences (best: ${(similar[0].score * 100).toFixed(0)}% TF-IDF)`);
     const bestExp = similar[0];
     const adaptationPrompt = `Previous similar problem: "${bestExp.input}"
 Previous solution: "${bestExp.output}"
-Strategy used: ${bestExp.strategy} (confidence: ${bestExp.confidence}%)
+Strategy: ${bestExp.strategy} (confidence: ${bestExp.confidence}%)
 
 New problem: "${input}"
 
-Adapt the previous solution to this new problem. If the same approach works, use it. If not, suggest what to change.`;
+Adapt the previous solution. If the same approach works, use it. If not, suggest changes.`;
 
     const adapted = await callWorker(CLOUD_BRAIN, CLOUD_BRAIN_TOKEN, 'sovereign-cloud', adaptationPrompt, 300);
     return { adapted: true, solution: adapted, source: bestExp, strategy: 'memory_first' };
   }
 
   stats.memory_misses++;
-  log('info', 'L1: No similar experiences found — fresh reasoning');
+  log('info', 'L1: No similar experiences — fresh reasoning');
   return { adapted: false, solution: null, strategy: getBestStrategy() };
 }
 
@@ -180,36 +189,40 @@ Adapt the previous solution to this new problem. If the same approach works, use
 // LAYER 2: SELF-CORRECTION
 // After each response, verify against memory, detect contradictions
 // ═══════════════════════════════════════════════════════════════════════
-async function layer2_selfCorrection(response, input) {
-  log('think', 'L2: Self-Correction — verifying response...');
+async function layer2_selfCorrection(response, input, generatorRegion = 'cortex') {
+  log('think', 'L2: Self-Correction — cross-model verification + CoVe...');
 
-  // Blind verification (MARCH pattern: checker doesn't see original reasoning)
-  const verifierPrompt = `You are a strict fact-checker. You have NOT seen the reasoning process, only the final output.
+  // P0: Cross-model verification (verifier ≠ generator)
+  const crossCheck = await AGI.crossModelVerify(response, generatorRegion, input, REGIONS, callWorker);
+  stats.cross_model_verifies++;
+  log('info', `L2: Cross-model verify by ${crossCheck.verifier}: ${crossCheck.passed ? 'PASS' : 'FAIL'}`);
 
-Output to verify: "${response.slice(0, 800)}"
+  // P1: CoVe-style verification questions
+  const coveCheck = await AGI.coveVerification(response, input, REGIONS, callWorker);
+  stats.cove_verifications++;
+  log('info', `L2: CoVe verification: ${coveCheck.passed ? 'PASS' : 'FAIL'} (${coveCheck.issues} issues)`);
 
-Check for:
-1. Factual errors or fabricated claims
-2. Logical contradictions
-3. Missing caveats on uncertain claims
-4. Contradictions with known facts
-
-Reply with ONLY: "VERIFIED" or "ERRORS: [list specific issues]"`;
-
-  const verification = await callWorker(CLOUD_BRAIN, CLOUD_BRAIN_TOKEN, 'sovereign-cloud', verifierPrompt, 200);
-
-  if (verification && verification.startsWith('ERRORS')) {
+  // Combine results — if either fails, correct
+  if (!crossCheck.passed || !coveCheck.passed) {
     stats.self_corrections++;
-    log('warn', `L2: Self-correction needed: ${verification.slice(0, 200)}`);
+    const issues = [];
+    if (!crossCheck.passed) issues.push(`Cross-model: ${crossCheck.result.slice(0, 200)}`);
+    if (!coveCheck.passed) issues.push(`CoVe: ${coveCheck.verdict?.slice(0, 200)}`);
 
-    // Auto-correct
-    const correctionPrompt = `Your previous response contained errors:\n${verification}\n\nOriginal response: "${response.slice(0, 800)}"\n\nProvide a corrected version that fixes ALL listed issues.`;
+    log('warn', `L2: Correction needed (${issues.length} sources)`);
+
+    const correctionPrompt = `Your response contained errors:
+${issues.join('\n\n')}
+
+Original: "${response.slice(0, 800)}"
+
+Fix ALL issues and provide corrected response. Be factual, specific.`;
     const corrected = await callWorker(CLOUD_BRAIN, CLOUD_BRAIN_TOKEN, 'sovereign-cloud', correctionPrompt, 400);
-    return { corrected: true, text: corrected || response, issues: verification };
+    return { corrected: true, text: corrected || response, issues: issues.join('; '), crossModel: crossCheck.passed, cove: coveCheck.passed };
   }
 
-  log('ok', 'L2: Response verified — no issues found');
-  return { corrected: false, text: response, issues: null };
+  log('ok', 'L2: Both cross-model and CoVe verification passed');
+  return { corrected: false, text: response, issues: null, crossModel: true, cove: true };
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -463,8 +476,20 @@ async function selfHeal(error, context) {
 // Learn from every interaction, update strategies
 // ═══════════════════════════════════════════════════════════════════════
 function selfUpdate(input, response, metadata) {
-  // Store experience for future L1 lookups
-  storeExperience(input, response, metadata);
+  // P1: Tiered memory store (hot→warm→cold)
+  const exp = {
+    id: Date.now().toString(36),
+    timestamp: Date.now(),
+    input: input.slice(0, 500),
+    output: response.slice(0, 500),
+    intent: metadata.intent || 'general',
+    confidence: metadata.confidence || 50,
+    regions_used: metadata.regions || [],
+    strategy: metadata.strategy || 'consensus',
+    success: metadata.success !== false,
+    corrections: metadata.corrections || 0
+  };
+  AGI.tieredStore(exp);
 
   // Update region performance tracking
   if (metadata.regions) {
@@ -473,7 +498,18 @@ function selfUpdate(input, response, metadata) {
     }
   }
 
-  // Periodically analyze own performance (every 50 messages)
+  // P1: Quality Decay tracking
+  AGI.updateQualityDecay(metadata.timeMs || 5000, metadata.confidence || 50, metadata.success !== false);
+
+  // P2: Skill compilation every 25 messages
+  if (stats.messages % 25 === 0 && stats.messages > 0) {
+    const experiences = AGI.loadJSON(EXPERIENCES_FILE, []);
+    const skills = AGI.compileSkills(experiences);
+    stats.skills_compiled = skills.length;
+    log('learn', `Skills compiled: ${skills.length}`);
+  }
+
+  // Performance analysis every 50 messages
   if (stats.messages % 50 === 0 && stats.messages > 0) {
     analyzePerformance();
   }
@@ -629,36 +665,55 @@ async function agiProcess(input, chatId) {
     // Full AGI pipeline
     strategy = l1.strategy || 'consensus';
 
-    // L4: Multi-Reasoning — get initial response via consensus
-    const selectedRegions = Object.keys(REGIONS).sort(() => Math.random() - 0.5).slice(0, efficiency.numRegions);
-    log('consensus', `Regions: ${selectedRegions.join(', ')}`);
+    // P1: Task-adaptive consensus protocol
+    const protocol = AGI.selectConsensusProtocol(intent);
+    log('consensus', `Protocol: ${protocol.protocol} (${protocol.description})`);
 
-    brainResults = await Promise.all(selectedRegions.map(async region => {
-      const cfg = REGIONS[region];
-      const t0 = Date.now();
-      const content = await callWorker(cfg.url, cfg.token, cfg.model,
-        `[You are ${region}. Specialty: ${cfg.role}]\n\nQuery: ${input}\n\nProvide your analysis. Be factual, specific.`, efficiency.maxTokens);
-      const ms = Date.now() - t0;
-      const valid = content && content.length > 10;
-      log(valid ? 'ok' : 'warn', `${region}: ${valid ? content.length + 'ch' : 'FAIL'} (${ms}ms)`);
-      return { region, content, weight: cfg.weight, role: cfg.role, valid };
-    }));
+    // P2: AAD pre-drafting — each region drafts independently first
+    log('think', 'P2: AAD pre-drafting (anti-anchoring)...');
+    const preDrafts = await AGI.aadDrafting(input, Object.keys(REGIONS), callWorker, REGIONS);
+    log('ok', `P2: ${preDrafts.length} independent drafts`);
 
-    const valid = brainResults.filter(r => r.valid);
-    if (!valid.length) {
-      log('warn', 'All regions failed — mandatory execute');
-      response = await mandatoryExecute(input, chatId);
+    // P2: Early quorum detection
+    if (AGI.detectEarlyQuorum(preDrafts)) {
+      stats.quorum_detections++;
+      log('ok', 'P2: Early quorum detected — using top draft');
+      response = preDrafts[0].draft;
+      strategy = 'quorum';
     } else {
-      // Synthesize
-      const texts = valid.map(s => `[${s.region} (${s.role})]\n${(s.content || '').slice(0, 500)}`);
-      const synthPrompt = `Combine these brain region analyses into one clear, accurate response.\nRules: Only state facts from MULTIPLE regions. If uncertain, say so.\n\n${texts.join('\n\n---\n\n')}`;
-      response = await callWorker(CLOUD_BRAIN, CLOUD_BRAIN_TOKEN, 'sovereign-cloud', synthPrompt, efficiency.maxTokens);
-      if (!response) response = valid[0].content;
+      // Full consensus with task-adaptive protocol
+      const numRegions = protocol.numRegions;
+      const selectedRegions = Object.keys(REGIONS).sort(() => Math.random() - 0.5).slice(0, numRegions);
+      log('consensus', `Regions: ${selectedRegions.join(', ')}`);
+
+      brainResults = await Promise.all(selectedRegions.map(async region => {
+        const cfg = REGIONS[region];
+        const t0 = Date.now();
+        const content = await callWorker(cfg.url, cfg.token, cfg.model,
+          `[You are ${region}. Specialty: ${cfg.role}]\n\nQuery: ${input}\n\nProvide your analysis. Be factual, specific.`, efficiency.maxTokens);
+        const ms = Date.now() - t0;
+        const valid = content && content.length > 10;
+        log(valid ? 'ok' : 'warn', `${region}: ${valid ? content.length + 'ch' : 'FAIL'} (${ms}ms)`);
+        return { region, content, weight: cfg.weight, role: cfg.role, valid };
+      }));
+
+      const valid = brainResults.filter(r => r.valid);
+      if (!valid.length) {
+        log('warn', 'All regions failed — mandatory execute');
+        response = await mandatoryExecute(input, chatId);
+      } else {
+        // Synthesize based on protocol
+        const texts = valid.map(s => `[${s.region} (${s.role})]\n${(s.content || '').slice(0, 500)}`);
+        const synthPrompt = `Combine these ${protocol.protocol} analyses into one clear, accurate response.\nRules: Only state facts from MULTIPLE regions. If uncertain, say so.\n\n${texts.join('\n\n---\n\n')}`;
+        response = await callWorker(CLOUD_BRAIN, CLOUD_BRAIN_TOKEN, 'sovereign-cloud', synthPrompt, efficiency.maxTokens);
+        if (!response) response = valid[0].content;
+      }
     }
   }
 
-  // L2: Self-Correction
-  const l2 = await layer2_selfCorrection(response, input);
+  // L2: Self-Correction (cross-model + CoVe)
+  const generatorRegion = brainResults ? brainResults.filter(r => r.valid).sort((a,b) => b.weight - a.weight)[0]?.region : 'cortex';
+  const l2 = await layer2_selfCorrection(response, input, generatorRegion);
   if (l2.corrected) {
     response = l2.text;
     log('warn', `L2: Corrected response (issues: ${l2.issues.slice(0, 100)})`);
@@ -730,8 +785,9 @@ async function handleMessage(text, chatId, firstName) {
   if (cmd === '/version') {
     const avgConf = stats.confidence_scores.length ?
       Math.round(stats.confidence_scores.reduce((a, b) => a + b) / stats.confidence_scores.length) : 0;
+    const quality = AGI.loadJSON(QUALITY_FILE, { current: 0, ori: 0 });
     await tgApi('sendMessage', { chat_id: chatId, text:
-      `EON AGI v7.0\n━━━━━━━━━━━━\n8 Layers: Universal Solving, Self-Correction,\nRSI, Multi-Reasoning, Goal Alignment,\nEfficiency, Causal, Uncertainty\n\nRegions: ${Object.keys(REGIONS).length}\nAvg confidence: ${avgConf}%\nHeal events: ${stats.heal_events}\nRSI improvements: ${stats.rsi_improvements}` });
+      `EON AGI v8.0\n━━━━━━━━━━━━\n8 Layers + P0/P1/P2 Upgrades\n\nP0: TF-IDF retrieval, cross-model verify, holdout eval\nP1: Task-adaptive consensus, CoVe, Quality Decay, Tiered memory\nP2: AAD pre-drafting, early quorum, skill compiler\n\nRegions: ${Object.keys(REGIONS).length}\nAvg confidence: ${avgConf}%\nQuality: ${quality.current?.toFixed(1)}%\nORI: ${quality.ori?.toFixed(3)}\nSkills compiled: ${stats.skills_compiled}\nCoVe verifications: ${stats.cove_verifications}\nCross-model: ${stats.cross_model_verifies}\nQuorum detections: ${stats.quorum_detections}` });
     return;
   }
 
@@ -895,21 +951,25 @@ process.on('unhandledRejection', e => { log('err', `unhandled: ${e}`); });
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
   ensureMemoryDir();
-  log('ok', '╔═══════════════════════════════════════╗');
-  log('ok', '║  EON AGI v7.0 — 8-Layer Intelligence ║');
-  log('ok', '╠═══════════════════════════════════════╣');
-  log('ok', `║  L1 Universal Problem Solving  ✓     ║`);
-  log('ok', `║  L2 Self-Correction            ✓     ║`);
-  log('ok', `║  L3 Recursive Self-Improvement ✓     ║`);
-  log('ok', `║  L4 Multi-Reasoning            ✓     ║`);
-  log('ok', `║  L5 Goal Alignment             ✓     ║`);
-  log('ok', `║  L6 Efficiency Optimization    ✓     ║`);
-  log('ok', `║  L7 Causal Understanding       ✓     ║`);
-  log('ok', `║  L8 Uncertainty Quantification ✓     ║`);
-  log('ok', '╠═══════════════════════════════════════╣');
-  log('ok', `║  Self-Heal: Active                   ║`);
-  log('ok', `║  Self-Update: Active                 ║`);
-  log('ok', `║  Mandatory Execute: Always           ║`);
-  log('ok', '╚═══════════════════════════════════════╝');
+  log('ok', '╔═══════════════════════════════════════════╗');
+  log('ok', '║  EON AGI v8.0 — 8-Layer + Self-Upgrade   ║');
+  log('ok', '╠═══════════════════════════════════════════╣');
+  log('ok', `║  L1 Universal Problem Solving  ✓ (TF-IDF)║`);
+  log('ok', `║  L2 Self-Correction            ✓ (CoVe)  ║`);
+  log('ok', `║  L3 Recursive Self-Improvement ✓ (RSI)   ║`);
+  log('ok', `║  L4 Multi-Reasoning            ✓ (AAD)   ║`);
+  log('ok', `║  L5 Goal Alignment             ✓         ║`);
+  log('ok', `║  L6 Efficiency Optimization    ✓         ║`);
+  log('ok', `║  L7 Causal Understanding       ✓         ║`);
+  log('ok', `║  L8 Uncertainty Quantification ✓         ║`);
+  log('ok', '╠═══════════════════════════════════════════╣');
+  log('ok', `║  P0: Cross-model verify, Holdout eval     ║`);
+  log('ok', `║  P1: CoVe, Quality Decay, Tiered memory  ║`);
+  log('ok', `║  P2: AAD pre-draft, Early quorum, Skills ║`);
+  log('ok', '╠═══════════════════════════════════════════╣');
+  log('ok', `║  Self-Heal: Active                       ║`);
+  log('ok', `║  Self-Update: Active                     ║`);
+  log('ok', `║  Mandatory Execute: Always               ║`);
+  log('ok', '╚═══════════════════════════════════════════╝');
   log('ok', `Listening on :${PORT}`);
 });
