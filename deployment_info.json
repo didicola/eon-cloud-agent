@@ -1,0 +1,14 @@
+{
+  "key": "cloud-opencode-node5-deployment",
+  "timestamp": "2026-07-30T12:03:00Z",
+  "node": 5,
+  "name": "cloud-opencode",
+  "architecture": "EON v7.5 Ghost",
+  "services": {
+    "blind-proxy": {"port": 8090, "models": 523, "type": "9-tier $0 fallback proxy"},
+    "matrix-brain": {"port": 8201, "script": "eon_matrix_8200.py", "routes_to": "blind-proxy:8090"},
+    "socat-proxy": {"port": 8443}
+  },
+  "model": "eon-matrix/auto",
+  "start_command": "/mnt/fluid-cloud/cloud-opencode/start.sh"
+}
