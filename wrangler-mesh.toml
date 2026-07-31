@@ -1,0 +1,20 @@
+name = "eon-mesh-swarm"
+main = "unified_mesh.js"
+compatibility_date = "2026-07-31"
+compatibility_flags = ["nodejs_compat"]
+[[kv_namespaces]]
+binding = "MESH_STATE"
+id = "4b82a5a416324902914a81c499e09d71"
+[[kv_namespaces]]
+binding = "DNS_ZONE"
+id = "a649d28db4094d0fa1ae069aaf89c078"
+[[kv_namespaces]]
+binding = "SWARM_KV"
+id = "d23383c6226b48d995fd9eb59bfedea1"
+[durable_objects]
+bindings = [
+  {name = "MESH_NODES", class_name = "MeshNode"}
+]
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["MeshNode"]
