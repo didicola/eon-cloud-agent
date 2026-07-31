@@ -91,7 +91,7 @@ PYEOF
 
 usage() {
   cat <<EOF
-${CYAN}eondeploy v4.1.0${NC} — EON Worker deploy tool (wrangler alternative)
+${CYAN}eondeploy v4.2.0${NC} — EON Worker deploy tool (wrangler alternative)
 
 ${GREEN}COMMANDS${NC}
   deploy <file> --name <name> [options]
@@ -100,7 +100,10 @@ ${GREEN}COMMANDS${NC}
     Options:
       --name <n>       Worker name (required)
       --kv <b>=<id>    KV binding (name=id)
-      --do <b>=<c>     DO binding (name=class)
+      --do <b>=<c>     Durable Object binding (name=ClassName)
+      --queue <b>=<q>  Queue producer binding (name=queueName) → env.<b>.send()
+      --consume <q>    Mark worker as consumer of queue <q> (export `queue(batch, ctx)`)
+      --r2 <b>=<bk>    R2-style object storage binding (name=bucket)
       --svc <b>=<w>    Service binding (name=worker)
       --var <k>=<v>    Plaintext var binding
       --secret <k>=<v> Secret binding (stored in secrets/<name>/)
@@ -147,6 +150,7 @@ EOF
 # ─── Config ───────────────────────────────────────────────────
 WORKER_NAME=""; WORKER_FILE=""; COMPAT_DATE="2026-07-31"
 KV_BINDINGS=(); DO_BINDINGS=(); SVC_BINDINGS=(); VAR_BINDINGS=(); SECRET_BINDINGS=()
+QUEUE_BINDINGS=(); CONSUME_QUEUES=(); R2_BINDINGS=()
 LOCAL=false; CF=false; DRY_RUN=false; CRONS=(); TIMEOUT_MS=""
 CONFIG_PATH=""; ENV_PROFILE=""
 
@@ -156,6 +160,9 @@ parse_flags() {
       --name) WORKER_NAME="$2"; shift 2 ;;
       --kv) KV_BINDINGS+=("$2"); shift 2 ;;
       --do) DO_BINDINGS+=("$2"); shift 2 ;;
+      --queue) QUEUE_BINDINGS+=("$2"); shift 2 ;;
+      --consume) CONSUME_QUEUES+=("$2"); shift 2 ;;
+      --r2) R2_BINDINGS+=("$2"); shift 2 ;;
       --svc) SVC_BINDINGS+=("$2"); shift 2 ;;
       --var) VAR_BINDINGS+=("$2"); shift 2 ;;
       --secret) SECRET_BINDINGS+=("$2"); shift 2 ;;
@@ -354,6 +361,26 @@ cmd_deploy_local() {
     cron_json="[${citems%,}]"
   fi
 
+  # Queues JSON: { producers: {NAME: queue}, consumers: [queue,...], max_batch_size }
+  local queues_json='{}'
+  if [ ${#QUEUE_BINDINGS[@]} -gt 0 ] || [ ${#CONSUME_QUEUES[@]} -gt 0 ]; then
+    local qprods=""; local qcons=""
+    for b in "${QUEUE_BINDINGS[@]}"; do qprods+="\"${b%%=*}\":\"${b#*=}\","; done
+    for c in "${CONSUME_QUEUES[@]}"; do qcons+="\"$c\","; done
+    queues_json="{"
+    [ -n "$qprods" ] && queues_json+="\"producers\":{${qprods%,}},"
+    [ -n "$qcons" ] && queues_json+="\"consumers\":[${qcons%,}]"
+    queues_json="${queues_json%,}}"
+  fi
+
+  # R2 JSON: { NAME: bucket }
+  local r2_json='{}'
+  if [ ${#R2_BINDINGS[@]} -gt 0 ]; then
+    local r2items=""
+    for b in "${R2_BINDINGS[@]}"; do r2items+="\"${b%%=*}\":\"${b#*=}\","; done
+    r2_json="{${r2items%,}}"
+  fi
+
   cat > "$vdir/meta.json" <<META
 {
   "name": "$WORKER_NAME",
@@ -364,6 +391,8 @@ cmd_deploy_local() {
   "services": $svc_json,
   "vars": $vars_json,
   "crons": $cron_json,
+  "queues": $queues_json,
+  "r2_bindings": $r2_json,
   "timeout_ms": $( [ -n "$TIMEOUT_MS" ] && echo "$TIMEOUT_MS" || echo "null" ),
   "env_profile": $( [ -n "$ENV_PROFILE" ] && echo "\"$ENV_PROFILE\"" || echo "null" ),
   "deployed_at": $(date +%s)
@@ -663,7 +692,7 @@ GI
   mkdir -p "$EON_ROOT/templates"
   cp "$EON_ROOT/templates/eondeploy.schema.json" "$dir/eondeploy.schema.json" 2>/dev/null \
     || cat > "$dir/eondeploy.schema.json" <<'SCHEMA'
-{ "$schema": "http://json-schema.org/draft-07/schema#", "type": "object", "properties": { "name": { "type": "string" }, "main": { "type": "string" }, "kv_bindings": { "type": "array" }, "services": { "type": "object" }, "vars": { "type": "object" }, "crons": { "type": "array" }, "assets": { "type": "string" } } }
+{ "$schema": "http://json-schema.org/draft-07/schema#", "type": "object", "properties": { "name": { "type": "string" }, "main": { "type": "string" }, "kv_bindings": { "type": "array" }, "do_bindings": { "type": "array" }, "services": { "type": "object" }, "vars": { "type": "object" }, "crons": { "type": "array" }, "queues": { "type": "object" }, "r2_bindings": { "type": "object" }, "assets": { "type": "string" } } }
 SCHEMA
   echo -e "${GREEN}✓${NC} Created project $dir"
   echo -e "  ${CYAN}deploy:${NC} eondeploy deploy $dir/worker.js --name $name (or cd $dir && eondeploy deploy)"

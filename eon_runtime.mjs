@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 // ═══════════════════════════════════════════════════════════════
-// EON Worker Runtime v4.1.0 — local alternative to Cloudflare Workers
+// EON Worker Runtime v4.2.0 — local alternative to Cloudflare Workers
 // Serves Workers on *.eon-mesh.internal (127.0.0.1:8787 + HTTPS :443)
 // Features: KV(TTL/meta/pagination), Secrets, cron/scheduled handlers,
 //   ctx.waitUntil, request timeouts, service bindings, auth'd mgmt plane,
-//   health/metrics, atomic versioned deploys, streaming responses
+//   health/metrics, atomic versioned deploys, streaming responses,
+//   Durable Objects (single-flight, KV-persisted), Queues, R2 storage,
+//   env.AI binding, crash containment fence, request IDs
 // ═══════════════════════════════════════════════════════════════
 import {
   readFileSync, existsSync, mkdirSync, writeFileSync, readdirSync,
@@ -25,7 +27,7 @@ const TOKEN_FILE = '/tmp/eon_runtime.token';
 const ENABLE_HTTPS = process.argv.includes('--https');
 const NO_AUTH = process.argv.includes('--no-auth');
 const REQUEST_TIMEOUT = +process.argv.find(a => a.startsWith('--timeout='))?.split('=')[1] || 30000;
-const VERSION = '4.1.0';
+const VERSION = '4.2.0';
 const STARTED = Date.now();
 
 for (const d of [WORKERS_DIR, KV_DIR, SECRETS_DIR, LOGS_DIR]) {
@@ -48,12 +50,12 @@ function logCrash(type, e) {
 process.on('uncaughtException', (e) => {
   logCrash('uncaughtException', e);
   console.error('[runtime] uncaughtException contained:', e?.message || e);
-  try { workers.clear(); } catch {}
+  try { workers.clear(); doInstances.clear(); } catch {}
 });
 process.on('unhandledRejection', (e) => {
   logCrash('unhandledRejection', e);
   console.error('[runtime] unhandledRejection contained:', e?.message || e);
-  try { workers.clear(); } catch {}
+  try { workers.clear(); doInstances.clear(); } catch {}
 });
 
 // ─── Auth ────────────────────────────────────────────────────
@@ -229,14 +231,238 @@ function makeAiBinding(workerName) {
   };
 }
 
+// ─── Durable Objects (single-flight, KV-persisted) ───────────
+// Workers write: `class MyDO extends DurableObject { constructor(state, env) {...} async fetch(request) {...} }`
+//   and export the class. `DurableObject` is available as a global (bare identifier),
+//   mirroring `cloudflare:workers`. Namespaces come from meta.do_bindings ("NAME=ClassName").
+class DurableObjectBase {
+  constructor(state, env) { this.state = state; this.env = env; }
+}
+globalThis.DurableObject = DurableObjectBase;
+
+const doInstances = new Map(); // "bindName:id" -> DoInstance
+
+function makeDoStorage(kv) {
+  return {
+    async get(key) {
+      if (key == null) {
+        const out = {};
+        const r = kv.list({ limit: 1000 });
+        for (const k of (r.keys || [])) { const v = kv.get(k.name); if (v != null) { try { out[k.name] = JSON.parse(v); } catch { out[k.name] = v; } } }
+        return out;
+      }
+      const v = kv.get(key);
+      if (v == null) return undefined;
+      try { return JSON.parse(v); } catch { return v; }
+    },
+    async put(key, value, opts = {}) { kv.put(key, JSON.stringify(value), opts); },
+    async delete(key) { kv.delete(key); },
+    async list(opts = {}) { const r = kv.list(opts); return { keys: (r.keys || []).map(k => ({ name: k.name })), cursor: r.cursor }; }
+  };
+}
+
+class DoInstance {
+  constructor(workerName, bindName, id, Class, env) {
+    this.key = `${bindName}:${id}`;
+    this.workerName = workerName;
+    this.bindName = bindName;
+    this.id = id;
+    this._chain = Promise.resolve();
+    this._waitUntil = [];
+    this.storage = new LocalKV(`__do/${bindName}/${id}`);
+    const self = this;
+    const state = {
+      storage: makeDoStorage(this.storage),
+      id,
+      waitUntil: (p) => { self._waitUntil.push(Promise.resolve(p).catch(() => {})); },
+      blockConcurrencyWhile: (p) => { self._chain = self._chain.then(() => Promise.resolve(p).catch(() => {})); }
+    };
+    this.obj = new Class(state, env);
+  }
+  run(thunk) {
+    const run = this._chain.then(thunk);
+    this._chain = run.then(() => {}, () => {});
+    return run;
+  }
+}
+
+function findDoClass(worker, className) {
+  if (!worker.mod) return null;
+  for (const v of Object.values(worker.mod)) {
+    if (typeof v === 'function' && v.prototype && v.prototype instanceof DurableObjectBase) {
+      if (!className || v.name === className) return v;
+    }
+  }
+  return null;
+}
+
+async function dispatchDo(worker, bindName, className, id, input, init) {
+  const mod = await worker.loadModule();
+  const Class = findDoClass(worker, className);
+  if (!Class) throw new Error(`DO class '${className || '?'}' not exported by worker ${worker.name}`);
+  const key = `${bindName}:${id}`;
+  let inst = doInstances.get(key);
+  if (!inst) { inst = new DoInstance(worker.name, bindName, id, Class, worker.env); doInstances.set(key, inst); }
+  let urlStr = typeof input === 'string' ? input : (input instanceof Request ? input.url : input.url);
+  const method = (init?.method || (input instanceof Request ? input.method : 'GET'));
+  const headers = Object.fromEntries(
+    init?.headers ? new Headers(init.headers).entries() : (input instanceof Request ? input.headers.entries() : [])
+  );
+  const body = init?.body ?? (input instanceof Request ? await input.text() : undefined);
+  const request = new Request(urlStr, { method, headers, body });
+  const ms = worker.meta.timeout_ms || REQUEST_TIMEOUT;
+  try {
+    const res = await inst.run(() => withTimeout(inst.obj.fetch(request), ms, 'do.fetch'));
+    for (const p of inst._waitUntil) p.catch(() => {});
+    inst._waitUntil = [];
+    bumpDo(worker.name, true);
+    return res;
+  } catch (e) {
+    bumpDo(worker.name, false);
+    logLine(worker.name, 'error', `DO ${bindName}:${id}`, { error: e.message });
+    return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { 'content-type': 'application/json' } });
+  }
+}
+
+function makeDoNamespace(getWorker, bindName, className) {
+  const nsKey = `${bindName}:${className || ''}`;
+  return {
+    idFromName(name) { return createHash('sha256').update(`${nsKey}:${name}`).digest('hex').slice(0, 32); },
+    newUniqueId() { return randomBytes(16).toString('hex'); },
+    idFromString(s) { return String(s); },
+    get(id) {
+      if (!/^[0-9a-f]{32}$/.test(String(id))) throw new Error(`invalid Durable Object id: ${id}`);
+      return { fetch: (input, init) => dispatchDo(getWorker(), bindName, className, String(id), input, init) };
+    }
+  };
+}
+
+// ─── Queues (persistent producer→consumer, batch delivery) ───
+// Producer: meta.queues.producers { NAME: queueName } → env.NAME.send(msg)
+// Consumer: meta.queues.consumers [queueName] + worker exports `async queue(batch, ctx)`.
+// Extension over CF: multiple consumers of one queue fan out (each gets a copy).
+function makeQueueProducer(queueName) {
+  return {
+    async send(message, opts = {}) {
+      const dir = `${KV_DIR}/__queues/${queueName}`;
+      if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+      const id = `${Date.now()}-${randomBytes(4).toString('hex')}`;
+      writeFileSync(`${dir}/${id}.json`, JSON.stringify({ id, ts: Date.now(), body: message, delay: opts.delaySeconds || 0, retries: 0 }));
+      return id;
+    },
+    async sendBatch(messages = []) { const ids = []; for (const m of messages) ids.push(await this.send(m)); return ids; }
+  };
+}
+
+function buildConsumerMap() {
+  const map = new Map(); // queueName -> Set(worker names)
+  for (const name of readdirSync(WORKERS_DIR)) {
+    const w = loadWorker(name);
+    if (!w || !Array.isArray(w.meta.queues?.consumers)) continue;
+    for (const q of w.meta.queues.consumers) {
+      if (!map.has(q)) map.set(q, new Set());
+      map.get(q).add(name);
+    }
+  }
+  return map;
+}
+
+async function deliverQueues() {
+  for (const [queueName, workerNames] of buildConsumerMap()) {
+    const dir = `${KV_DIR}/__queues/${queueName}`;
+    if (!existsSync(dir)) continue;
+    let files;
+    try { files = readdirSync(dir).filter(f => f.endsWith('.json')); } catch { continue; }
+    if (!files.length) continue;
+    for (const workerName of workerNames) {
+      const worker = getOrCreateWorkerModule(workerName);
+      if (!worker) continue;
+      const mod = await worker.loadModule();
+      const ex = mod.default || mod;
+      if (typeof ex.queue !== 'function') continue;
+      const maxBatch = worker.meta.queues?.max_batch_size || 10;
+      const batchMsgs = []; const ids = [];
+      const now = Date.now();
+      for (const f of files) {
+        let m;
+        try { m = JSON.parse(readFileSync(`${dir}/${f}`, 'utf-8')); } catch { try { rmSync(`${dir}/${f}`); } catch {} continue; }
+        if (m.delay && now < (m.ts || now) + m.delay * 1000) continue; // delayed, not due yet
+        batchMsgs.push({ id: m.id, timestamp: m.ts, body: m.body, attempts: m.retries || 0 });
+        ids.push(f);
+        if (batchMsgs.length >= maxBatch) break;
+      }
+      if (!batchMsgs.length) continue;
+      const ctx = makeContext(worker);
+      try {
+        await withTimeout(ex.queue({ messages: batchMsgs, queue: queueName, batchSize: batchMsgs.length }, ctx),
+          worker.meta.timeout_ms || REQUEST_TIMEOUT, 'queue');
+        for (const id of ids) { try { rmSync(`${dir}/${id}`); } catch {} }
+        for (const p of ctx.pending) p.catch(() => {});
+        bump(workerName, 'ok');
+        logLine(workerName, 'info', `queue delivered ${batchMsgs.length} msgs from ${queueName}`);
+      } catch (e) {
+        for (const id of ids) {
+          try {
+            const m = JSON.parse(readFileSync(`${dir}/${id}`, 'utf-8'));
+            m.retries = (m.retries || 0) + 1;
+            if (m.retries >= 3) { rmSync(`${dir}/${id}`); logLine(workerName, 'error', `queue ${queueName}: dropped msg ${m.id} after 3 attempts`); }
+            else writeFileSync(`${dir}/${id}`, JSON.stringify(m));
+          } catch {}
+        }
+        logLine(workerName, 'error', `queue ${queueName} delivery failed: ${e.message}`);
+        bump(workerName, 'err');
+      }
+    }
+  }
+}
+setInterval(() => { try { deliverQueues(); } catch (e) { console.error('[runtime] queue delivery:', e.message); } }, 2000);
+
+// ─── R2-style object storage ─────────────────────────────────
+// meta.r2_bindings { NAME: bucket } → env.NAME.put/get/delete/list
+function makeR2Binding(bucketName) {
+  const dir = `${KV_DIR}/__r2/${bucketName}`;
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  const pathFor = (key) => `${dir}/${safe(key)}`;
+  return {
+    async put(key, value, opts = {}) {
+      const p = pathFor(key);
+      writeFileSync(`${p}.tmp`, String(value));
+      renameSync(`${p}.tmp`, p);
+      const meta = { key, etag: createHash('sha1').update(String(value)).digest('hex'), size: Buffer.byteLength(String(value)), customMetadata: opts.customMetadata || {}, httpMetadata: opts.httpMetadata || {}, uploaded: Date.now() };
+      writeFileSync(`${p}.meta`, JSON.stringify(meta));
+      return { key, etag: meta.etag, size: meta.size };
+    },
+    async get(key) {
+      const p = pathFor(key);
+      if (!existsSync(p)) return null;
+      const meta = existsSync(`${p}.meta`) ? JSON.parse(readFileSync(`${p}.meta`, 'utf-8')) : {};
+      const body = new Response(String(readFileSync(p, 'utf-8')));
+      return { key, body: body.body, size: meta.size, etag: meta.etag, httpMetadata: meta.httpMetadata, customMetadata: meta.customMetadata, text: () => body.text(), json: () => body.json() };
+    },
+    async delete(key) { for (const ext of ['', '.meta']) { try { rmSync(pathFor(key) + ext); } catch {} } },
+    async list(opts = {}) {
+      let files;
+      try { files = readdirSync(dir).filter(f => !f.endsWith('.meta') && !f.endsWith('.tmp') && f.startsWith(safe(opts.prefix || ''))); } catch { files = []; }
+      const limit = Math.min(opts.limit || 1000, 1000);
+      const objects = files.slice(0, limit).map(f => ({ key: f, size: statSync(`${dir}/${f}`).size }));
+      return { objects, truncated: files.length > limit };
+    }
+  };
+}
+
 // ─── Stats ───────────────────────────────────────────────────
 const stats = new Map();
 function bump(name, key) {
-  if (!stats.has(name)) stats.set(name, { requests: 0, errors: 0, aiCalls: 0, aiLatencyMs: 0, lastSuccess: null, lastError: null, startedAt: STARTED });
+  if (!stats.has(name)) stats.set(name, { requests: 0, errors: 0, aiCalls: 0, aiLatencyMs: 0, doCalls: 0, doErrors: 0, lastSuccess: null, lastError: null, startedAt: STARTED });
   const s = stats.get(name);
   if (key === 'req') s.requests++;
   if (key === 'err') { s.errors++; s.lastError = Date.now(); }
   if (key === 'ok') s.lastSuccess = Date.now();
+  return s;
+}
+function bumpDo(workerName, ok) {
+  const s = bump(workerName, ok ? 'ok' : 'err');
+  if (ok) s.doCalls++; else s.doErrors++;
   return s;
 }
 
@@ -284,10 +510,18 @@ function getOrCreateWorkerModule(name) {
     const [bindName, ns] = b.split('=');
     env[bindName] = new LocalKV(ns || bindName.toLowerCase());
   }
-  // DO bindings (declared; construction deferred)
+  // DO bindings (real namespaces — class resolved lazily on first stub fetch)
   for (const b of (w.meta.do_bindings || [])) {
     const [bindName, className] = b.split('=');
-    env[bindName] = { _class: className, _note: 'DO emulation pending — see meta.do_bindings' };
+    env[bindName] = makeDoNamespace(() => registered, bindName, className || '');
+  }
+  // Queues (producer bindings)
+  for (const [bindName, queueName] of Object.entries(w.meta.queues?.producers || {})) {
+    env[bindName] = makeQueueProducer(queueName);
+  }
+  // R2-style object storage bindings
+  for (const [bindName, bucket] of Object.entries(w.meta.r2_bindings || {})) {
+    env[bindName] = makeR2Binding(bucket);
   }
   // Secrets
   Object.assign(env, loadSecrets(name));
@@ -304,7 +538,7 @@ function getOrCreateWorkerModule(name) {
   }
 
   const registered = {
-    env, version: w.version, meta: w.meta,
+    name, env, version: w.version, meta: w.meta,
     loadModule: async () => {
       if (registered.mod) return registered.mod;
       const moduleUrl = new URL(`file://${w.jsPath}`).href;
@@ -486,9 +720,10 @@ async function serverListener(req, res) {
           crons: w.meta.crons || []
         };
         if (s.aiCalls > 0) { hw.aiCalls = s.aiCalls; hw.aiLatencyMs = s.aiLatencyMs; }
+        if (s.doCalls > 0) { hw.doCalls = s.doCalls; hw.doErrors = s.doErrors; }
         list.push(hw);
       }
-      json({ status: 'ok', runtime: { version: VERSION, pid: process.pid, uptime_s: Math.round((Date.now() - STARTED) / 1000) }, workers: list });
+      json({ status: 'ok', runtime: { version: VERSION, pid: process.pid, uptime_s: Math.round((Date.now() - STARTED) / 1000), durable_objects: doInstances.size }, workers: list });
       return;
     }
     if (url.pathname === '/__metrics') {
@@ -501,7 +736,15 @@ async function serverListener(req, res) {
         out += `eon_ai_calls_total{worker="${name}"} ${s.aiCalls || 0}\n`;
         out += `eon_ai_latency_ms_sum{worker="${name}"} ${s.aiLatencyMs || 0}\n`;
         out += `eon_ai_latency_ms_count{worker="${name}"} ${s.aiCalls || 0}\n`;
+        out += `eon_do_calls_total{worker="${name}"} ${s.doCalls || 0}\n`;
+        out += `eon_do_errors_total{worker="${name}"} ${s.doErrors || 0}\n`;
       }
+      for (const q of readdirSync(`${KV_DIR}/__queues`, { withFileTypes: true }).filter(d => d.isDirectory())) {
+        let depth = 0;
+        try { depth = readdirSync(`${KV_DIR}/__queues/${q.name}`).filter(f => f.endsWith('.json')).length; } catch {}
+        out += `eon_queue_depth{queue="${q.name}"} ${depth}\n`;
+      }
+      out += `eon_durable_objects_total ${doInstances.size}\n`;
       out += `# HELP eon_requests_duration_ms Request latency histogram (max 1000 samples/worker)\n`;
       const buckets = [5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000];
       for (const [name, samples] of perWorkerLatency) {
@@ -525,6 +768,7 @@ async function serverListener(req, res) {
         try {
           const data = JSON.parse(body);
           workers.delete(data.name);
+          doInstances.clear();
           logLine(data.name, 'info', 'deployed', { version: data.version });
           json({ status: 'deployed', name: data.name, version: data.version });
         } catch (e) { json({ error: e.message }, 400); }
