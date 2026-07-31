@@ -1,0 +1,7 @@
+name = "eon-mesh-storage"
+main = "storage_swarm.js"
+compatibility_date = "2026-07-31"
+compatibility_flags = ["nodejs_compat"]
+[[kv_namespaces]]
+binding = "SWARM_KV"
+id = "d23383c6226b48d995fd9eb59bfedea1"

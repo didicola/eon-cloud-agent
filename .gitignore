@@ -1,0 +1,4 @@
+kv/
+logs/
+*.db
+*.log

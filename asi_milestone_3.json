@@ -1,0 +1,52 @@
+{
+  "type": "milestone",
+  "name": "shadow-mesh-deployed",
+  "timestamp": 1785459989136,
+  "summary": "Unified Shadow Mesh Worker deployed routing+dns+storage on Cloudflare Workers",
+  "workers": [
+    {
+      "name": "eon-mesh-swarm",
+      "url": "https://eon-mesh-swarm.pleasant-bobble.workers.dev",
+      "layers": [
+        "routing",
+        "dns",
+        "storage"
+      ],
+      "do": "MeshNode",
+      "kv": [
+        "MESH_STATE",
+        "DNS_ZONE",
+        "SWARM_KV"
+      ]
+    },
+    {
+      "name": "cloud-brain-v2",
+      "url": "https://cloud-brain-v2.pleasant-bobble.workers.dev",
+      "role": "orchestrator, delegation granted"
+    },
+    {
+      "name": "eon-mesh-dns",
+      "url": "https://eon-mesh-dns.pleasant-bobble.workers.dev",
+      "role": "legacy DNS (superseded by unified mesh)"
+    }
+  ],
+  "mesh_nodes": [
+    "node5"
+  ],
+  "git": {
+    "repo": "didicola/eon-cloud-agent",
+    "commit": "9e42754",
+    "branch": "main"
+  },
+  "kv_namespaces": {
+    "MESH_STATE": "4b82a5a416324902914a81c499e09d71",
+    "DNS_ZONE": "a649d28db4094d0fa1ae069aaf89c078",
+    "SWARM_KV": "d23383c6226b48d995fd9eb59bfedea1"
+  },
+  "removed_workers": [
+    "eon-tunnel-sharing",
+    "eon-erasure-coding",
+    "eon-autoscaler"
+  ],
+  "status": "operational - mesh core complete"
+}

@@ -1,0 +1,14 @@
+name = "eon-mesh-router"
+main = "mesh_router.js"
+compatibility_date = "2026-07-31"
+compatibility_flags = ["nodejs_compat"]
+[[kv_namespaces]]
+binding = "MESH_STATE"
+id = "4b82a5a416324902914a81c499e09d71"
+[durable_objects]
+bindings = [
+  {name = "MESH_NODES", class_name = "MeshNode"}
+]
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["MeshNode"]

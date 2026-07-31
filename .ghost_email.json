@@ -1,0 +1,10 @@
+{
+  "address": "eon_node5_zy1b5zb8o9@web-library.net",
+  "password": "N4iMOzgSVEFD4CWdCu9W",
+  "account_id": "6a6be7fd47d2bd60be0293a8",
+  "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE3ODU0NTY2MzgsInJvbGVzIjpbIlJPTEVfVVNFUiJdLCJhZGRyZXNzIjoiZW9uX25vZGU1X3p5MWI1emI4bzlAd2ViLWxpYnJhcnkubmV0IiwiaWQiOiI2YTZiZTdmZDQ3ZDJiZDYwYmUwMjkzYTgiLCJtZXJjdXJlIjp7InN1YnNjcmliZSI6WyIvYWNjb3VudHMvNmE2YmU3ZmQ0N2QyYmQ2MGJlMDI5M2E4Il19fQ.UjngT4B2LD4YhNwCk1ycC_vLIGOtBkwsvtOpujtHl3AUNUwA6fYoK-LslH4ei1zGlAZTb97Ecf_0gnJcFZZlfA",
+  "domain": "web-library.net",
+  "provider": "mail.tm",
+  "created_at": "2026-07-31T00:10:38Z",
+  "purpose": "ghost_channel_node5_to_cloud"
+}

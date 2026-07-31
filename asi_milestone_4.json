@@ -1,0 +1,20 @@
+{
+  "milestone": 4,
+  "name": "EON Round Matrix v3.0",
+  "timestamp": 1785461300000,
+  "summary": "Complete architecture rebuild — unified 3-ring toroidal matrix",
+  "deployed_worker": "https://eon-round-matrix.pleasant-bobble.workers.dev",
+  "git_commit": "453e0e2",
+  "rings": {
+    "core": ["brain", "oracle", "memory"],
+    "mesh": ["router", "dns", "storage"],
+    "edge": ["watcher", "queue", "gateway"]
+  },
+  "variants": ["DO-based (round_matrix.js)", "Pure KV (round_matrix_pure.js)"],
+  "old_workers_replaced": ["cloud-brain-v2", "eon-mesh-swarm", "eon-mesh-dns",
+    "eon-tunnel-sharing", "eon-erasure-coding", "eon-autoscaler"],
+  "daemon_pid": "started via rm_daemon.sh",
+  "peers": ["node5"],
+  "dns_records": 8,
+  "status": "operational — temporary account near expiry, redeploy with CLOUDFLARE_API_KEY when ready"
+}

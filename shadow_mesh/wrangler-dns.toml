@@ -1,0 +1,7 @@
+name = "eon-mesh-dns"
+main = "dns_resolver.js"
+compatibility_date = "2026-07-31"
+compatibility_flags = ["nodejs_compat"]
+[[kv_namespaces]]
+binding = "DNS_ZONE"
+id = "a649d28db4094d0fa1ae069aaf89c078"
