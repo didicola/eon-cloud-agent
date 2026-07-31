@@ -1,0 +1,33 @@
+{
+  "mode": "PRIVATE_DARKNET",
+  "public_tor_deprecated": true,
+  "nodes": {
+    "ubuntu": {
+      "public_key": "f0aab324216df4f04a3e6651801356ec413bf6a01b966ddba0b339dbdfd8ed6b",
+      "private_key": "b786d00a2742e11066858745f25682adc717e338e392bb69be1e53c2accf82604d3b1b4b837014fe54b809d421be504a0bdd68f603b3cd2b96a1d9f32cbd6853",
+      "ygg_address": "200:1eaa:99b7:bd24:161f:6b83:335c:ffd9",
+      "listen": "tcp://0.0.0.0:51820",
+      "wan_peer": "tcp://<UBUNTU_WAN_ADDR>:51820",
+      "ifname": "yggdrasil-ubuntu",
+      "systemd_service": "ubuntu-yggdrasil.service",
+      "config": "ubuntu-peer.hjson"
+    },
+    "termux": {
+      "public_key": "863c7b6b555e254b9113d473be4514fc7ee995b966b2334915a3b38d0d63c4c9",
+      "ygg_address": null,
+      "peers": [
+        "tcp://<UBUNTU_WAN_ADDR>:51820"
+      ],
+      "allowed_public_keys": [
+        "f0aab324216df4f04a3e6651801356ec413bf6a01b966ddba0b339dbdfd8ed6b"
+      ],
+      "ifname": "yggdrasil-termux",
+      "config": "termux-peer.hjson"
+    }
+  },
+  "matrix_patch": {
+    "darknet_mode_env": "DARKNET_MODE=1",
+    "behavior": "Internal ops route over Yggdrasil IPv6 peer addresses. External AI still -> cloud-bridge -> our cloud via Tor."
+  },
+  "note": "Keys never touch public Tor. Deploy on real ubuntu LXC node 5 + termux phone (TUN-capable kernels)."
+}
