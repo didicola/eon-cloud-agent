@@ -52,8 +52,10 @@ def list_deploy():
 
 def ping_https(url, timeout=8):
     try:
-        r=urllib.request.urlopen(url, timeout=timeout)
-        return {"target":url,"status":"up","code":r.status}
+        r=subprocess.run(["curl","-s","--socks5-hostname","127.0.0.1:9050","--max-time",str(timeout),
+                          "-o","/dev/null","-w","%{http_code}",url],capture_output=True,text=True,timeout=timeout+2)
+        code=int((r.stdout or "0").strip() or "0")
+        return {"target":url,"status":"up" if 200<=code<400 else "down","code":code}
     except Exception as e:
         return {"target":url,"status":"down","err":str(e)[:80]}
 
