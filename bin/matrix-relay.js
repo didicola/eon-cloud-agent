@@ -8,6 +8,7 @@
 const http = require("http");
 const https = require("https");
 const fs = require("fs");
+const { execFile } = require("child_process");
 
 const PORT = parseInt(process.env.EON_MCP_PORT || "8095");
 const HOME = process.env.EON_HOME || process.env.HOME || "/home/ricos";
@@ -15,23 +16,36 @@ const OUT = HOME + "/eon-cloud-agent/commands/eo-coordineon_MATRIX.md";
 const OUT_JSON = HOME + "/eon-cloud-agent/commands/eo-coordineon_MATRIX.json";
 
 function ping(u) {
+  if (u.startsWith("https://")) {
+    // Guard §2.2: outbound must go through Tor SOCKS — use curl --socks5-hostname
+    return new Promise(r => {
+      const t = Date.now();
+      execFile("curl", ["-s","--socks5-hostname","127.0.0.1:9050","--max-time","8",
+        "-o","/dev/null","-w","%{http_code}", u], (err, stdout) => {
+        if (err) return r({ target: u, ok: false, err: String(err).slice(0,80) });
+        const code = parseInt(String(stdout).trim() || "0");
+        r({ target: u, code, ok: code >= 200 && code < 400, ms: Date.now() - t });
+      });
+    });
+  }
   const lib = u.startsWith("https") ? https : http;
   return new Promise(r => {
     try {
       const t = Date.now();
-      lib.get(u, res => r({ target: u, code: res.statusCode, ok: res.statusCode >= 200 && res.statusCode < 400, ms: Date.now() - t })).on("error", e => r({ target: u, ok: false, err: String(e) }));
+      lib.get(u, res => r({ target: u, code: res.statusCode, ok: res.statusCode >= 200 && res.statusCode < 400, ms: Date.now() - t })).on("error", e => r({ target: u, ok: false, err: String(e).slice(0,80) }));
       setTimeout(() => r({ target: u, ok: false, err: "timeout" }), 6000);
-    } catch (e) { r({ target: u, ok: false, err: String(e) }); }
+    } catch (e) { r({ target: u, ok: false, err: String(e).slice(0,80) }); }
   });
 }
 
 const C = {
   cloud: ["http://127.0.0.1:8303/health", "http://127.0.0.1:8304/health", "http://127.0.0.1:8081/health"],
-  web:  ["https://eon-site.d1matrix.workers.dev/health"]
+  web:  ["https://eon-site.exportdefaultasyncfetchrequestenvconsturl.workers.dev/api/health"],
+  p2p:  ["https://eon-p2p-cloud.exportdefaultasyncfetchrequestenvconsturl.workers.dev/health"]
 };
 
 async function tick() {
-  const all = await Promise.all([...C.cloud, ...C.web].map(ping));
+  const all = await Promise.all([...C.cloud, ...C.web, ...C.p2p].map(ping));
   const ts = new Date().toISOString().replace("T", " ").slice(0, 19) + " UTC";
   let s = `# AI Cloud <-> Web <-> Termux Coordination Matrix  (tick: ${ts})\n`;
   s += all.map(x => "- " + x.target + " -> " + (x.ok ? "UP (" + x.code + ")" : "DOWN " + (x.err || x.code))).join("\n") + "\n";
