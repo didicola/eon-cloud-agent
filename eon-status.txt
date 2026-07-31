@@ -1,0 +1,21 @@
+===== EON STATUS (read this from the file bridge: http://10.140.40.177:8080/eon-status.txt) =====
+
+TERMUX CONFIG TO BE APPLIED ON NEXT POLL CYCLE (Termux reads commands/ via git):
+  -> commands/termux_1785517132.cmd   (FINAL: cloud-only opencode.json + darknet ygg + bridge:8877)
+
+WHAT THIS FIXES (vs the broken banner you saw):
+  * "eon-p2p-cloud.workers.dev" was NXDOMAIN (worker never deployed) -> replaced
+  * bridge moved off IPFS's port 8080 -> Termux serves on 8877 internally; discover the onion here
+  * public Tor deprecated; internal routing -> Yggdrasil IPv6 mesh
+  * opencode model pinned to twin-ubuntu/auto (sovereign cloud only), darknet_mode=1
+
+SOVEREIGN ADDRESSES:
+  ubuntu  Ygg6 201:cb13:92d1:f23f:ac06:ad1f:d8af:7906   pubkey 4d3b1b4b837014fe…
+  termux  Ygg6 200:f387:929:5543:b568:ddd8:5718:8375  (trusts ubuntu pubkey)
+  cloud   cloud-brain-proxy + sovereign-llm(Workers AI) via Tor
+
+THIS BANNER MEANT:
+  "Serving HTTP on 0.0.0.0 port 8080" was Termux's own python http.server — live inside the
+  proot/WiFi namespace. This Ubuntu shell CANNOT reach 10.140.40.177 (guard + proot boundary).
+  You browse it here (same WiFi): http://10.140.40.177:8080  (once you pull from git).
+
