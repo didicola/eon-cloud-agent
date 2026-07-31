@@ -1,0 +1,7 @@
+name = "eon-round-matrix"
+main = "round_matrix_pure.js"
+compatibility_date = "2026-07-31"
+compatibility_flags = ["nodejs_compat"]
+[[kv_namespaces]]
+binding = "MATRIX_KV"
+id = "478df9e9b0cd4157b05cd3231d334ec3"

@@ -1,0 +1,29 @@
+{
+  "name": "eon-node5-fallback",
+  "compatibility_date": "2026-07-31",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "src/index.js",
+  "workers_dev": true,
+  "routes": [
+    { "pattern": "r2-tiering.eon-node5.workers.dev", "custom_domain": false },
+    { "pattern": "erasure.eon-node5.workers.dev", "custom_domain": false },
+    { "pattern": "share.eon-node5.workers.dev", "custom_domain": false },
+    { "pattern": "autoscaler.eon-node5.workers.dev", "custom_domain": false }
+  ],
+  "durable_objects": {
+    "bindings": [
+      { "name": "AUTOSCALER", "class_name": "Autoscaler" }
+    ]
+  },
+  "kv_namespaces": [
+    { "binding": "SHARD_KV", "id": "" },
+    { "binding": "ERASURE_CONFIG", "id": "" },
+    { "binding": "SCALE_KV", "id": "" },
+    { "binding": "TIER_CONFIG", "id": "" },
+    { "binding": "SHARE_KV", "id": "" }
+  ],
+  "r2_buckets": [
+    { "binding": "HOT_BUCKET", "bucket_name": "eon-hot" },
+    { "binding": "COLD_BUCKET", "bucket_name": "eon-cold" }
+  ]
+}

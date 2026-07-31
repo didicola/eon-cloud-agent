@@ -1,0 +1,7 @@
+{
+  "name": "round-matrix",
+  "compat_date": "2026-07-31",
+  "kv_bindings": ["MATRIX_KV=matrix_kv"],
+  "do_bindings": [],
+  "deployed_at": 1785461493
+}
