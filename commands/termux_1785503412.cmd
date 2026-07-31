@@ -1,0 +1,3 @@
+FROM: ubuntu
+TIME: 2026-07-31 13:10:12
+CMD: echo '=== OPENCODE VERSION ===' && (opencode --version 2>&1 || echo 'no opencode in PATH') && echo '=== PROCESSES ===' && (ps aux | grep -iE 'opencode|matrix|coordinator|blind-proxy' | grep -v grep | head -20 || echo 'none') && echo '=== MATRIX STATUS ===' && (curl -s --max-time 5 http://127.0.0.1:8200/health 2>/dev/null || echo 'matrix down') && echo '=== BLIND PROXY ===' && (curl -s --max-time 5 http://127.0.0.1:8090/v1/models 2>/dev/null | head -c 200 || echo 'blind-proxy down')
