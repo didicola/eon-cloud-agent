@@ -1,49 +1,56 @@
 #!/usr/bin/env node
 /*
- * Permanent AI Cloud <-> AI Web coordination matrix
- * - round-robin tick every 60s
- * - persists state to commands/eo-coordineon_MATRIX.md
- * - self-healing: relaunches on crash via the daemon below
+ * EON permanent coordination matrix daemon (DnA-upgrade 2026-07-31)
+ * - 60s round-robin: AI Cloud (8303/8304/8081) <-> AI Web (eon-site) <-> Termux bridge
+ * - writes state JSON + markdown to commands/eo-coordineon_MATRIX.{"md","json"}
+ * - localhost + HTTP /status endpoint on :8095 (guard-allowed)
  */
+const http = require("http");
 const https = require("https");
-const { execSync } = require("child_process");
 const fs = require("fs");
 
-const C = {
-  cloud:  { twinUbuntu:"http://127.0.0.1:8303/health", twinTermux:"http://127.0.0.1:8304/health", brain:"http://127.0.0.1:8081/health" },
-  web:    { site:"https://eon-site.d1matrix.workers.dev/health", api:"/api/eon/matrix" },
-  state:  "/root/eon-cloud-agent/commands/eo-coordineon_MATRIX.md"
-};
+const PORT = parseInt(process.env.EON_MCP_PORT || "8095");
+const HOME = process.env.EON_HOME || process.env.HOME || "/home/ricos";
+const OUT = HOME + "/eon-cloud-agent/commands/eo-coordineon_MATRIX.md";
+const OUT_JSON = HOME + "/eon-cloud-agent/commands/eo-coordineon_MATRIX.json";
 
-function ping(url) {
+function ping(u) {
+  const lib = u.startsWith("https") ? https : http;
   return new Promise(r => {
     try {
-      const t0 = Date.now();
-      https.get(url, (res) => {
-        r({url, code: res.statusCode, ms: Date.now()-t0, ok: res.statusCode===200});
-      }).on("error", e => r({url, code: 0, ms: Date.now()-t0, ok:false, err:e.message}));
-      setTimeout(() => r({url, code:0, ms:6000, ok:false, err:"timeout"}), 6000);
-    } catch(e){ r({url, code:0, ok:false, err:e.message}); }
+      const t = Date.now();
+      lib.get(u, res => r({ target: u, code: res.statusCode, ok: res.statusCode >= 200 && res.statusCode < 400, ms: Date.now() - t })).on("error", e => r({ target: u, ok: false, err: String(e) }));
+      setTimeout(() => r({ target: u, ok: false, err: "timeout" }), 6000);
+    } catch (e) { r({ target: u, ok: false, err: String(e) }); }
   });
 }
 
-function tick() {
-  Promise.all([
-    ping(C.cloud.twinUbuntu), ping(C.cloud.twinTermux), ping(C.cloud.brain),
-    ping(C.web.site)
-  ]).then(([tu,tt,br,web]) => {
-    const ts = new Date().toISOString().replace("T"," ").slice(0,19) + " UTC";
-    let s = `# AI Cloud <-> AI Web Coordination Matrix  (tick: ${ts})\n`;
-    s += `- AI Cloud twin-ubuntu :8303 → ${tu.ok?"healthy":"DOWN"} (${tu.code})\n`;
-    s += `- AI Cloud twin-termux :8304 → ${tt.ok?"healthy":"DOWN"} (${tt.code})\n`;
-    s += `- cloud-brain :8081 → ${br.ok?"EON Sovereign Workers Runtime":"DOWN"} (${br.code})\n`;
-    s += `- AI Web eon-site → ${web.ok?"healthy":"DEAD 404 — routes not mounted"} (${web.code})\n`;
-    s += `- next tick in 60s (self-healing)\n`;
-    fs.writeFileSync(C.state, s);
-    console.log(`[${ts}] matrix tick → cloud:${tu.ok&&tt.ok&&br.ok?"UP":"DEGRADED"} web:${web.ok?"UP":"DOWN"}`);
-  });
+const C = {
+  cloud: ["http://127.0.0.1:8303/health", "http://127.0.0.1:8304/health", "http://127.0.0.1:8081/health"],
+  web:  ["https://eon-site.d1matrix.workers.dev/health"]
+};
+
+async function tick() {
+  const all = await Promise.all([...C.cloud, ...C.web].map(ping));
+  const ts = new Date().toISOString().replace("T", " ").slice(0, 19) + " UTC";
+  let s = `# AI Cloud <-> Web <-> Termux Coordination Matrix  (tick: ${ts})\n`;
+  s += all.map(x => "- " + x.target + " -> " + (x.ok ? "UP (" + x.code + ")" : "DOWN " + (x.err || x.code))).join("\n") + "\n";
+  s += "- next tick in 60s (self-healing)\n";
+  try {
+    fs.writeFileSync(OUT, s);
+    fs.writeFileSync(OUT_JSON, JSON.stringify({ tick: ts, surfaces: all }, null, 2));
+    console.log("[" + ts + "] matrix tick -> " + OUT_JSON);
+  } catch (e) {
+    fs.writeFileSync("/tmp/eo-coordineon_MATRIX.md", s);
+    fs.writeFileSync("/tmp/eo-coordineon_MATRIX.json", JSON.stringify({ tick: ts, surfaces: all }, null, 2));
+    console.log("[" + ts + "] matrix tick -> /tmp fallback (" + e + ")");
+  }
 }
 
 tick();
 setInterval(tick, 60000);
-process.on("uncaughtException", (e)=>{ console.error("matrix-relay crashed:",e.message); process.exit(1); });
+
+http.createServer((q, s) => {
+  if (q.url === "/status") s.end("eon matrix up " + new Date().toISOString() + " tick=" + OUT_JSON);
+  else { s.statusCode = 404; s.end("matrix relay — see commands/eo-coordineon_MATRIX.*"); }
+}).listen(PORT, "127.0.0.1");
