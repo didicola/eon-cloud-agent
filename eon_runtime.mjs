@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // ═══════════════════════════════════════════════════════════════
-// EON Worker Runtime v4.0.0 — local alternative to Cloudflare Workers
+// EON Worker Runtime v4.1.0 — local alternative to Cloudflare Workers
 // Serves Workers on *.eon-mesh.internal (127.0.0.1:8787 + HTTPS :443)
 // Features: KV(TTL/meta/pagination), Secrets, cron/scheduled handlers,
 //   ctx.waitUntil, request timeouts, service bindings, auth'd mgmt plane,
@@ -25,12 +25,36 @@ const TOKEN_FILE = '/tmp/eon_runtime.token';
 const ENABLE_HTTPS = process.argv.includes('--https');
 const NO_AUTH = process.argv.includes('--no-auth');
 const REQUEST_TIMEOUT = +process.argv.find(a => a.startsWith('--timeout='))?.split('=')[1] || 30000;
-const VERSION = '4.0.0';
+const VERSION = '4.1.0';
 const STARTED = Date.now();
 
 for (const d of [WORKERS_DIR, KV_DIR, SECRETS_DIR, LOGS_DIR]) {
   if (!existsSync(d)) mkdirSync(d, { recursive: true });
 }
+
+// ─── Crash containment fence ─────────────────────────────────
+// One bad worker must never kill the cloud: log the crash to
+// runtime-crash.log, drop the module cache so the next request
+// reloads clean modules, then keep serving (do NOT re-throw).
+function logCrash(type, e) {
+  try {
+    appendFileSync(`${LOGS_DIR}/runtime-crash.log`, JSON.stringify({
+      ts: new Date().toISOString(), type,
+      message: e?.message || String(e),
+      stack: e?.stack || ''
+    }) + '\n');
+  } catch {}
+}
+process.on('uncaughtException', (e) => {
+  logCrash('uncaughtException', e);
+  console.error('[runtime] uncaughtException contained:', e?.message || e);
+  try { workers.clear(); } catch {}
+});
+process.on('unhandledRejection', (e) => {
+  logCrash('unhandledRejection', e);
+  console.error('[runtime] unhandledRejection contained:', e?.message || e);
+  try { workers.clear(); } catch {}
+});
 
 // ─── Auth ────────────────────────────────────────────────────
 function readToken() {
@@ -66,11 +90,13 @@ class LocalKV {
   }
   put(key, value, opts = {}) {
     const path = this._path(key);
-    writeFileSync(path, value);
-    if (opts.metadata) writeFileSync(`${path}.meta`, JSON.stringify(opts.metadata));
+    // write-temp-then-rename: a crash never leaves a partial canonical file
+    writeFileSync(`${path}.tmp`, value);
+    renameSync(`${path}.tmp`, path);
+    if (opts.metadata) { writeFileSync(`${path}.meta.tmp`, JSON.stringify(opts.metadata)); renameSync(`${path}.meta.tmp`, `${path}.meta`); }
     else if (existsSync(`${path}.meta`)) rmSync(`${path}.meta`);
-    if (opts.expirationTtl) writeFileSync(`${path}.ttl`, String(Date.now() + opts.expirationTtl * 1000));
-    else if (opts.expiration) writeFileSync(`${path}.ttl`, String(opts.expiration));
+    if (opts.expirationTtl) { writeFileSync(`${path}.ttl.tmp`, String(Date.now() + opts.expirationTtl * 1000)); renameSync(`${path}.ttl.tmp`, `${path}.ttl`); }
+    else if (opts.expiration) { writeFileSync(`${path}.ttl.tmp`, String(opts.expiration)); renameSync(`${path}.ttl.tmp`, `${path}.ttl`); }
     else if (existsSync(`${path}.ttl`)) rmSync(`${path}.ttl`);
     return true;
   }
@@ -90,10 +116,16 @@ class LocalKV {
     const prefix = safe(opts.prefix || '');
     const limit = Math.min(opts.limit || 1000, 1000);
     const cursor = +(opts.cursor || 0);
-    let files = readdirSync(this.dir).filter(f => !f.endsWith('.meta') && !f.endsWith('.ttl'));
-    // drop expired
-    for (const f of files) { if (this._expired(`${this.dir}/${f}`)) { rmSync(`${this.dir}/${f}`); rmSync(`${this.dir}/${f}.meta`); rmSync(`${this.dir}/${f}.ttl`); } }
-    files = readdirSync(this.dir).filter(f => !f.endsWith('.meta') && !f.endsWith('.ttl') && f.startsWith(prefix));
+    let files = readdirSync(this.dir).filter(f => !f.endsWith('.meta') && !f.endsWith('.ttl') && !f.endsWith('.tmp'));
+    // drop expired: move canonical files aside via .tmp first, then sweep
+    // leftovers, so a crash never leaves a partial canonical file behind
+    for (const f of files) {
+      if (this._expired(`${this.dir}/${f}`)) {
+        for (const ext of ['', '.meta', '.ttl']) { try { renameSync(`${this.dir}/${f}${ext}`, `${this.dir}/${f}${ext}.tmp`); } catch {} }
+      }
+    }
+    for (const f of readdirSync(this.dir)) { if (f.endsWith('.tmp')) { try { rmSync(`${this.dir}/${f}`); } catch {} } }
+    files = readdirSync(this.dir).filter(f => !f.endsWith('.meta') && !f.endsWith('.ttl') && !f.endsWith('.tmp') && f.startsWith(prefix));
     const page = files.slice(cursor, cursor + limit).map(name => ({ name }));
     const nextCursor = cursor + limit < files.length ? String(cursor + limit) : undefined;
     return { keys: page, cursor: nextCursor, list_complete: !nextCursor };
@@ -117,16 +149,114 @@ function logLine(worker, level, msg, extra = {}) {
   try { appendFileSync(`${LOGS_DIR}/${worker}.log`, line + '\n'); } catch {}
 }
 
+// ─── AI binding (blind-proxy gateway, OpenAI-compatible) ─────
+const AI_GATEWAY = 'http://127.0.0.1:8090/v1';
+const AI_TIMEOUT_MS = 60000;
+async function aiFetch(path, options = {}) {
+  let lastErr = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), options.timeoutMs || AI_TIMEOUT_MS);
+    try {
+      const res = await fetch(`${AI_GATEWAY}${path}`, { ...options, signal: controller.signal });
+      if (!res.ok) throw new Error(`AI gateway ${path}: HTTP ${res.status} ${res.statusText}`);
+      return res;
+    } catch (e) {
+      lastErr = e;
+      if (attempt === 0) await new Promise(r => setTimeout(r, 500));
+    } finally {
+      clearTimeout(t);
+    }
+  }
+  throw new Error(`AI request failed: ${lastErr?.message || 'unknown error'}`);
+}
+function makeAiBinding(workerName) {
+  const rec = (ms) => {
+    const s = bump(workerName, 'ai');
+    s.aiCalls++;
+    s.aiLatencyMs += ms;
+  };
+  return {
+    gateway: AI_GATEWAY,
+    async chat(opts = {}) {
+      const t0 = Date.now();
+      try {
+        const { model, messages, tools, stream } = opts;
+        const body = { model, messages, tools };
+        if (stream) body.stream = true;
+        const res = await aiFetch('/chat/completions', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'authorization': 'Bearer sk-dummy' },
+          body: JSON.stringify(body)
+        });
+        const text = await res.text();
+        if (stream) {
+          const chunks = [];
+          for (const line of text.split('\n')) {
+            const l = line.trim();
+            if (!l.startsWith('data:')) continue;
+            const payload = l.slice(5).trim();
+            if (!payload || payload === '[DONE]') continue;
+            try {
+              const parsed = JSON.parse(payload);
+              for (const ch of (parsed.choices || [])) {
+                if (ch.delta && ch.delta.content != null) chunks.push(ch.delta.content);
+              }
+            } catch {}
+          }
+          return { streamed: chunks, model };
+        }
+        const parsed = JSON.parse(text);
+        // blind-proxy wraps upstream provider errors as { status: "4xx", msg } in HTTP 200 — surface them
+        if (parsed && parsed.status && String(parsed.status) !== '200' && !parsed.choices) {
+          throw new Error(`AI chat: upstream ${parsed.status} ${parsed.msg || parsed.error || ''}`.trim());
+        }
+        return { choices: parsed.choices, usage: parsed.usage, model: parsed.model, raw: parsed };
+      } finally {
+        rec(Date.now() - t0);
+      }
+    },
+    async models() {
+      const t0 = Date.now();
+      try {
+        const res = await aiFetch('/models');
+        const parsed = await res.json();
+        return { models: parsed.data || parsed.models || [] };
+      } finally {
+        rec(Date.now() - t0);
+      }
+    }
+  };
+}
+
 // ─── Stats ───────────────────────────────────────────────────
 const stats = new Map();
 function bump(name, key) {
-  if (!stats.has(name)) stats.set(name, { requests: 0, errors: 0, lastSuccess: null, lastError: null, startedAt: STARTED });
+  if (!stats.has(name)) stats.set(name, { requests: 0, errors: 0, aiCalls: 0, aiLatencyMs: 0, lastSuccess: null, lastError: null, startedAt: STARTED });
   const s = stats.get(name);
   if (key === 'req') s.requests++;
   if (key === 'err') { s.errors++; s.lastError = Date.now(); }
   if (key === 'ok') s.lastSuccess = Date.now();
   return s;
 }
+
+// Latency samples per worker (ring buffer, max 1000) for the histogram
+const perWorkerLatency = new Map();
+function trackLatency(name, ms) {
+  if (!perWorkerLatency.has(name)) perWorkerLatency.set(name, []);
+  const arr = perWorkerLatency.get(name);
+  arr.push(ms);
+  if (arr.length > 1000) arr.shift();
+}
+
+// Event-loop lag gauge: how late a 100ms tick actually fires
+let eventLoopLagMs = 0;
+let lastLagTick = Date.now();
+setInterval(() => {
+  const now = Date.now();
+  eventLoopLagMs = Math.max(0, now - lastLagTick - 100);
+  lastLagTick = now;
+}, 100);
 
 // ─── Worker Registry (atomic versioned) ──────────────────────
 const workers = new Map(); // name -> registered
@@ -163,6 +293,9 @@ function getOrCreateWorkerModule(name) {
   Object.assign(env, loadSecrets(name));
   // Vars
   Object.assign(env, w.meta.vars || {});
+  // AI binding (blind-proxy gateway — always available to every worker)
+  env.AI = makeAiBinding(name);
+  if (w.meta.ai && w.meta.ai.default_model) env.AI.defaultModel = w.meta.ai.default_model;
   // Service bindings (worker→worker)
   for (const [bindName, target] of Object.entries(w.meta.services || {})) {
     env[bindName] = {
@@ -273,7 +406,12 @@ async function callWorker(worker, request, ctx) {
   if (!ex || typeof ex.fetch !== 'function') throw new Error('worker has no fetch handler');
   const c = ctx || makeContext(worker);
   const ms = worker.meta.timeout_ms || REQUEST_TIMEOUT;
-  const response = await withTimeout(ex.fetch(request, worker.env, c), ms, 'fetch');
+  let response;
+  try {
+    response = await withTimeout(ex.fetch(request, worker.env, c), ms, 'fetch');
+  } catch (e) {
+    return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { 'content-type': 'application/json' } });
+  }
   if (!response || typeof response.status !== 'number') throw new Error('worker returned invalid response');
   for (const p of c.pending) p.catch(() => {});
   return response;
@@ -294,14 +432,21 @@ async function internalFetch(target, input, init) {
 }
 
 // ─── Write response to Node socket (streaming) ───────────────
-function writeResponse(res, response) {
+function writeResponse(res, response, reqId) {
   const status = response.status || 200;
   const headers = {};
   if (response.headers?.forEach) response.headers.forEach((v, k) => headers[k] = v);
   headers['access-control-allow-origin'] = headers['access-control-allow-origin'] || '*';
+  if (reqId) headers['x-eon-request-id'] = reqId;
   res.writeHead(status, headers);
   if (response.body && status !== 204 && status !== 304) {
-    try { Readable.fromWeb(response.body).pipe(res); } catch { res.end(); }
+    let stream = null;
+    try { stream = Readable.fromWeb(response.body); } catch { res.end(); return; }
+    // never hang: teardown cleanly on socket close/error or stream error
+    res.on('close', () => { try { stream.destroy(); } catch {} });
+    res.on('error', () => { try { stream.destroy(); } catch {} });
+    stream.on('error', () => { try { res.destroy(); } catch {} });
+    stream.pipe(res);
   } else {
     res.end();
   }
@@ -316,7 +461,7 @@ async function serverListener(req, res) {
   const t0 = Date.now();
 
   const json = (data, status = 200) => {
-    res.writeHead(status, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+    res.writeHead(status, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'x-eon-request-id': reqId });
     res.end(JSON.stringify(data));
   };
   const requireAuth = () => {
@@ -327,18 +472,21 @@ async function serverListener(req, res) {
 
   // ─── Management endpoints (auth'd) ───────────────────────
   if (url.pathname.startsWith('/__')) {
+    logLine('runtime', 'info', `${req.method} ${url.pathname}`, { reqId, ms: Date.now() - t0 });
     if (url.pathname === '/__health') {
       const list = [];
       for (const name of readdirSync(WORKERS_DIR)) {
         const w = loadWorker(name);
         if (!w) continue;
         const s = stats.get(name) || { requests: 0, errors: 0, lastSuccess: null, lastError: null };
-        list.push({
+        const hw = {
           name, version: w.version, requests: s.requests, errors: s.errors,
           ok: !s.lastError || (s.lastSuccess > s.lastError),
           lastSuccess: s.lastSuccess, lastError: s.lastError,
           crons: w.meta.crons || []
-        });
+        };
+        if (s.aiCalls > 0) { hw.aiCalls = s.aiCalls; hw.aiLatencyMs = s.aiLatencyMs; }
+        list.push(hw);
       }
       json({ status: 'ok', runtime: { version: VERSION, pid: process.pid, uptime_s: Math.round((Date.now() - STARTED) / 1000) }, workers: list });
       return;
@@ -350,7 +498,21 @@ async function serverListener(req, res) {
       for (const [name, s] of stats) {
         out += `eon_requests_total{worker="${name}"} ${s.requests}\n`;
         out += `eon_errors_total{worker="${name}"} ${s.errors}\n`;
+        out += `eon_ai_calls_total{worker="${name}"} ${s.aiCalls || 0}\n`;
+        out += `eon_ai_latency_ms_sum{worker="${name}"} ${s.aiLatencyMs || 0}\n`;
+        out += `eon_ai_latency_ms_count{worker="${name}"} ${s.aiCalls || 0}\n`;
       }
+      out += `# HELP eon_requests_duration_ms Request latency histogram (max 1000 samples/worker)\n`;
+      const buckets = [5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000];
+      for (const [name, samples] of perWorkerLatency) {
+        for (const b of buckets) {
+          const c = samples.reduce((n, ms) => n + (ms <= b ? 1 : 0), 0);
+          out += `eon_requests_duration_ms_bucket{worker="${name}",le="${b}"} ${c}\n`;
+        }
+        out += `eon_requests_duration_ms_bucket{worker="${name}",le="+Inf"} ${samples.length}\n`;
+        out += `eon_requests_duration_ms_count{worker="${name}"} ${samples.length}\n`;
+      }
+      out += `# HELP eon_event_loop_lag_ms Event-loop lag (ms)\neon_event_loop_lag_ms ${eventLoopLagMs}\n`;
       res.writeHead(200, { 'Content-Type': 'text/plain; version=0.0.4' });
       res.end(out);
       return;
@@ -455,16 +617,20 @@ async function serverListener(req, res) {
     try {
       const method = req.method;
       const body = req.bodyText || undefined;
-      const request = new Request(url.toString(), { method, headers: req.headers, body });
+      const fwdHeaders = { ...req.headers };
+      if (req.headers['x-eon-request-id']) fwdHeaders['x-eon-request-id'] = req.headers['x-eon-request-id'];
+      const request = new Request(url.toString(), { method, headers: fwdHeaders, body });
       const response = await callWorker(worker, request);
       bump(workerName, 'ok');
-      writeResponse(res, response);
+      writeResponse(res, response, reqId);
       logLine(workerName, 'info', `${method} ${url.pathname}`, { reqId, status: response.status, ms: Date.now() - t0 });
+      trackLatency(workerName, Date.now() - t0);
     } catch (e) {
       bump(workerName, 'err');
       logLine(workerName, 'error', `${req.method} ${url.pathname}`, { reqId, ms: Date.now() - t0, error: e.message });
+      trackLatency(workerName, Date.now() - t0);
       if (!res.headersSent) {
-        res.writeHead(500, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        res.writeHead(500, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'x-eon-request-id': reqId });
         res.end(JSON.stringify({ error: e.message, stack: e.stack?.split('\n').slice(0, 4).join('\n') }));
       } else {
         res.end();

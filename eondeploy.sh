@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ═══════════════════════════════════════════════════════════════
-# eondeploy v4.0.0 — EON's wrangler alternative
+# eondeploy v4.1.0 — EON's wrangler alternative
 # Deploy Workers to Cloudflare API OR local runtime
 # Usage: eondeploy <command> [options]
 # ═══════════════════════════════════════════════════════════════
@@ -28,9 +28,70 @@ api() {
   curl "${args[@]}"
 }
 
+# ─── Manifest (eondeploy.jsonc) ──────────────────────────────
+MANIFEST_NAME=""; MANIFEST_MAIN=""; MANIFEST_KV=(); MANIFEST_SERVICES=()
+MANIFEST_VARS=(); MANIFEST_CRONS=(); MANIFEST_ASSETS=""; ENV_PROFILE=""
+
+find_manifest() {
+  local cfg="${1:-}"
+  if [ -n "$cfg" ] && [ -f "$cfg" ]; then echo "$cfg"; return 0; fi
+  [ -f "./eondeploy.jsonc" ] && { echo "./eondeploy.jsonc"; return 0; }
+  return 1
+}
+
+load_manifest() {
+  # load_manifest <path> [env]
+  local path="$1"; local env="${2:-}"
+  [ -f "$path" ] || { echo -e "${RED}✗${NC} Manifest not found: $path" >&2; return 1; }
+  local pyout
+  pyout=$(python3 - "$path" "$env" <<'PYEOF'
+import json, re, sys
+path, env = sys.argv[1], sys.argv[2] or None
+src = open(path).read()
+src = re.sub(r'//.*', '', src)
+src = re.sub(r'/\*.*?\*/', '', src, flags=re.S)
+m = json.loads(src)
+def bindings_list(b, key):
+    out = []
+    for item in b.get(key, []):
+        out.append(f"{item.get('name')}={item.get('namespace') or item.get('worker') or item.get('value') or ''}")
+    return out
+def vars_obj(v):
+    return [f"{k}={v[k]}" for k in v] if isinstance(v, dict) else []
+def crons_list(c):
+    return c if isinstance(c, list) else ([c] if c else [])
+base = m
+if env and isinstance(m.get('env'), dict) and env in m['env']:
+    base = {**m, **m['env'][env]}
+crons = crons_list(base.get('crons', []))
+print(base.get('name',''))
+print(base.get('main',''))
+print(' '.join(bindings_list(base,'kv_bindings')))
+print(' '.join(f"{item.get('name')}={item.get('worker')}" for item in base.get('services',[])))
+print(' '.join(vars_obj(base.get('vars',{}))))
+print(len(crons))
+for c in crons:
+    print(c)
+print(base.get('assets',''))
+PYEOF
+)
+  mapfile -t PYOUT_LINES <<< "$pyout"
+  MANIFEST_NAME="${PYOUT_LINES[0]}"
+  MANIFEST_MAIN="${PYOUT_LINES[1]}"
+  MANIFEST_KV=(${PYOUT_LINES[2]})
+  MANIFEST_SERVICES=(${PYOUT_LINES[3]})
+  MANIFEST_VARS=(${PYOUT_LINES[4]})
+  local cron_count="${PYOUT_LINES[5]:-0}"
+  MANIFEST_CRONS=()
+  for ((i=0; i<cron_count; i++)); do MANIFEST_CRONS+=("${PYOUT_LINES[6+i]}"); done
+  MANIFEST_ASSETS="${PYOUT_LINES[6+cron_count]:-}"
+  ENV_PROFILE="$env"
+  return 0
+}
+
 usage() {
   cat <<EOF
-${CYAN}eondeploy v4.0.0${NC} — EON Worker deploy tool (wrangler alternative)
+${CYAN}eondeploy v4.1.0${NC} — EON Worker deploy tool (wrangler alternative)
 
 ${GREEN}COMMANDS${NC}
   deploy <file> --name <name> [options]
@@ -46,10 +107,13 @@ ${GREEN}COMMANDS${NC}
       --cron <expr>    Cron trigger (5-field, e.g. "*/5 * * * *")
       --timeout <ms>   Per-request timeout override
       --compat <date>  Compatibility date (default: 2026-07-31)
+      --config <path>  Use eondeploy.jsonc manifest (default: ./eondeploy.jsonc)
+      --env <profile>  Env profile from manifest (staging/prod) — overrides bindings
       --dry-run        Validate syntax only, do not deploy
       --local          Force local runtime
       --cf             Force Cloudflare API
 
+  init <name>    Scaffold a new project (eondeploy.jsonc + worker.js)
   list            List deployed Workers (local + CF)
   delete <name>   Delete a Worker
   secret put <name> <KEY> [value]   Store secret (stdin if no value)
@@ -64,6 +128,8 @@ ${GREEN}COMMANDS${NC}
   versions <name> List deploy versions
   rollback <name> Revert to previous version
   cron <name> [expr]  Fire scheduled handler on demand (test)
+  snapshot [--out <path>]  Backup workers/kv/secrets/certs (tar.gz)
+  restore <file.tar.gz>    Restore from a snapshot
   start [port] [--https]   Start local runtime server
   stop            Stop local runtime server
   logs            Show runtime stdout log
@@ -81,7 +147,8 @@ EOF
 # ─── Config ───────────────────────────────────────────────────
 WORKER_NAME=""; WORKER_FILE=""; COMPAT_DATE="2026-07-31"
 KV_BINDINGS=(); DO_BINDINGS=(); SVC_BINDINGS=(); VAR_BINDINGS=(); SECRET_BINDINGS=()
-LOCAL=false; CF=false; DRY_RUN=false; CRON_EXPR=""; TIMEOUT_MS=""
+LOCAL=false; CF=false; DRY_RUN=false; CRONS=(); TIMEOUT_MS=""
+CONFIG_PATH=""; ENV_PROFILE=""
 
 parse_flags() {
   while [[ $# -gt 0 ]]; do
@@ -92,9 +159,11 @@ parse_flags() {
       --svc) SVC_BINDINGS+=("$2"); shift 2 ;;
       --var) VAR_BINDINGS+=("$2"); shift 2 ;;
       --secret) SECRET_BINDINGS+=("$2"); shift 2 ;;
-      --cron) CRON_EXPR="$2"; shift 2 ;;
+      --cron) CRONS+=("$2"); shift 2 ;;
       --timeout) TIMEOUT_MS="$2"; shift 2 ;;
       --compat) COMPAT_DATE="$2"; shift 2 ;;
+      --config) CONFIG_PATH="$2"; shift 2 ;;
+      --env) ENV_PROFILE="$2"; shift 2 ;;
       --dry-run) DRY_RUN=true; shift ;;
       --local) LOCAL=true; shift ;;
       --cf) CF=true; shift ;;
@@ -123,8 +192,28 @@ cf_curl() {
 
 # ─── Deploy ───────────────────────────────────────────────────
 cmd_deploy() {
-  local file="$1"; shift
+  local file="${1:-}"
+  if [[ -n "$file" && "$file" == -* ]]; then file=""; fi
+  if [[ -n "$file" ]]; then shift; fi
   parse_flags "$@"
+
+  # Load manifest if present (--config or ./eondeploy.jsonc)
+  local manifest
+  manifest=$(find_manifest "${CONFIG_PATH:-}" || true)
+  if [ -n "$manifest" ]; then
+    if load_manifest "$manifest" "$ENV_PROFILE"; then
+      echo -e "${CYAN}[eondeploy]${NC} Manifest: $manifest${ENV_PROFILE:+ [env.$ENV_PROFILE]}"
+      [ -z "$WORKER_NAME" ] && WORKER_NAME="$MANIFEST_NAME"
+      [ -z "$WORKER_FILE" ] && { [ -n "$MANIFEST_MAIN" ] && WORKER_FILE="$MANIFEST_MAIN" || WORKER_FILE="$file"; }
+      # Manifest bindings apply only when no CLI flags given (wrangler non-inheritance: per-env replaces)
+      if [ ${#KV_BINDINGS[@]} -eq 0 ]; then KV_BINDINGS=("${MANIFEST_KV[@]}"); fi
+      if [ ${#SVC_BINDINGS[@]} -eq 0 ]; then SVC_BINDINGS=("${MANIFEST_SERVICES[@]}"); fi
+      if [ ${#VAR_BINDINGS[@]} -eq 0 ]; then VAR_BINDINGS=("${MANIFEST_VARS[@]}"); fi
+      if [ ${#CRONS[@]} -eq 0 ]; then CRONS=("${MANIFEST_CRONS[@]}"); fi
+      file="$WORKER_FILE"
+    fi
+  fi
+
   [ -z "$WORKER_NAME" ] && { echo -e "${RED}ERROR: --name required${NC}" >&2; exit 1; }
   [ ! -f "$file" ] && { echo -e "${RED}ERROR: file not found: $file${NC}" >&2; exit 1; }
 
@@ -257,6 +346,14 @@ cmd_deploy_local() {
     vars_json="{${items%,}}"
   fi
 
+  # Cron JSON: strictly [] when empty, ["expr",...] when set (valid JSON always)
+  local cron_json="[]"
+  if [ ${#CRONS[@]} -gt 0 ]; then
+    local citems=""
+    for c in "${CRONS[@]}"; do citems+="\"$c\","; done
+    cron_json="[${citems%,}]"
+  fi
+
   cat > "$vdir/meta.json" <<META
 {
   "name": "$WORKER_NAME",
@@ -266,8 +363,9 @@ cmd_deploy_local() {
   "do_bindings": $do_json,
   "services": $svc_json,
   "vars": $vars_json,
-  "crons": [$( [ -n "$CRON_EXPR" ] && echo "\"$CRON_EXPR\"" )],
+  "crons": $cron_json,
   "timeout_ms": $( [ -n "$TIMEOUT_MS" ] && echo "$TIMEOUT_MS" || echo "null" ),
+  "env_profile": $( [ -n "$ENV_PROFILE" ] && echo "\"$ENV_PROFILE\"" || echo "null" ),
   "deployed_at": $(date +%s)
 }
 META
@@ -524,6 +622,103 @@ cmd_cron() {
   api POST "/__scheduled" "{\"worker\":\"$name\",\"cron\":\"$cron\"}" | python3 -m json.tool
 }
 
+# ─── Init ─────────────────────────────────────────────────────
+cmd_init() {
+  local name="${1:-}"
+  [ -z "$name" ] && { echo -e "${RED}ERROR: eondeploy init <name>${NC}" >&2; exit 1; }
+  local dir="./$name"
+  [ -d "$dir" ] && { echo -e "${RED}✗${NC} Directory exists: $dir"; exit 1; }
+  mkdir -p "$dir"
+  cat > "$dir/eondeploy.jsonc" <<JSONC
+{
+  "//": "eondeploy project manifest — see template schema",
+  "name": "$name",
+  "main": "./worker.js",
+  // "kv_bindings": [ { "name": "MY_KV", "namespace": "mykv" } ],
+  // "services":   { "BRAIN": "round-matrix" },
+  // "vars":       { "MODE": "dev" },
+  // "crons":      [ "*/5 * * * *" ],
+  // "assets":     "./public",
+  // "env": { "staging": { "vars": { "MODE": "staging" } } }
+}
+JSONC
+  cat > "$dir/worker.js" <<'WORKER'
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    return new Response(JSON.stringify({
+      service: env.WORKER || 'worker',
+      path: url.pathname,
+      time: new Date().toISOString(),
+      env: Object.keys(env)
+    }), { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
+  }
+};
+WORKER
+  cat > "$dir/.gitignore" <<'GI'
+node_modules/
+.eon/
+GI
+  # Copy schema template
+  mkdir -p "$EON_ROOT/templates"
+  cp "$EON_ROOT/templates/eondeploy.schema.json" "$dir/eondeploy.schema.json" 2>/dev/null \
+    || cat > "$dir/eondeploy.schema.json" <<'SCHEMA'
+{ "$schema": "http://json-schema.org/draft-07/schema#", "type": "object", "properties": { "name": { "type": "string" }, "main": { "type": "string" }, "kv_bindings": { "type": "array" }, "services": { "type": "object" }, "vars": { "type": "object" }, "crons": { "type": "array" }, "assets": { "type": "string" } } }
+SCHEMA
+  echo -e "${GREEN}✓${NC} Created project $dir"
+  echo -e "  ${CYAN}deploy:${NC} eondeploy deploy $dir/worker.js --name $name (or cd $dir && eondeploy deploy)"
+}
+
+# ─── Snapshot / Restore (backup/DR) ──────────────────────────
+cmd_snapshot() {
+  local out="${1:-}"
+  local bkdir="$EON_ROOT/backups"
+  mkdir -p "$bkdir"
+  [ -z "$out" ] && out="$bkdir/eon-snapshot-$(date -u +%Y%m%dT%H%M%SZ).tar.gz"
+  local include=()
+  for d in workers kv secrets certs; do
+    [ -d "$EON_ROOT/$d" ] && include+=("$d")
+  done
+  [ ${#include[@]} -eq 0 ] && { echo -e "${YELLOW}⚠${NC} Nothing to snapshot"; return 0; }
+  tar czf "$out" -C "$EON_ROOT" "${include[@]}"
+  # Manifest file
+  local pid="unknown"; [ -f /tmp/eon_runtime.pid ] && pid=$(cat /tmp/eon_runtime.pid)
+  {
+    echo "snapshot: $out"
+    echo "created: $(date -u -Is)"
+    echo "pid: $pid"
+    echo "dirs: ${include[*]}"
+  } > "$out.manifest"
+  local size
+  size=$(du -h "$out" | cut -f1)
+  echo -e "${GREEN}✓${NC} Snapshot: $out ($size)"
+  echo -e "  Dirs: ${include[*]} | workers: $(ls "$EON_ROOT/workers" 2>/dev/null | wc -l)"
+}
+
+cmd_restore() {
+  local file="${1:-}"
+  [ -z "$file" ] || [ ! -f "$file" ] && { echo -e "${RED}ERROR: eondeploy restore <snapshot.tar.gz>${NC}" >&2; exit 1; }
+  echo -e "${YELLOW}⚠${NC} Restoring from $file — in-flight KV/state may be overwritten"
+  local tmp
+  tmp=$(mktemp -d)
+  tar xzf "$file" -C "$tmp"
+  for d in workers kv secrets certs; do
+    if [ -d "$tmp/$d" ]; then
+      cp -r "$tmp/$d" "$EON_ROOT/"
+      echo -e "${GREEN}✓${NC} Restored $d/"
+    fi
+  done
+  rm -rf "$tmp"
+  # Notify runtime to invalidate module cache for each worker
+  local n=0
+  for d in "$EON_ROOT/workers"/*/; do
+    [ -d "$d" ] || continue
+    local name=$(basename "$d")
+    api POST "/__deploy" "{\"name\":\"$name\"}" > /dev/null 2>&1 && n=$((n+1))
+  done
+  echo -e "${GREEN}✓${NC} Restored snapshot — $n workers refreshed in runtime"
+}
+
 # ─── Main ─────────────────────────────────────────────────────
 case "${1:-help}" in
   deploy)
@@ -559,6 +754,15 @@ case "${1:-help}" in
   cron)
     shift; cmd_cron "$@"
     ;;
+  init)
+    shift; cmd_init "$@"
+    ;;
+  snapshot)
+    shift; cmd_snapshot "${1:-}"
+    ;;
+  restore)
+    shift; cmd_restore "${1:-}"
+    ;;
   start)
     shift; cmd_start "$@"
     ;;
@@ -572,7 +776,7 @@ case "${1:-help}" in
     api GET "/__routes" 2>/dev/null | python3 -m json.tool 2>/dev/null || echo "Runtime not running"
     ;;
   version|--version|-v)
-    echo "eondeploy v4.0.0 — EON Worker deploy tool"
+    echo "eondeploy v4.1.0 — EON Worker deploy tool"
     echo "Runtime: Cloudflare API + local (127.0.0.1:8787)"
     ;;
   help|--help|-h)
