@@ -50,9 +50,19 @@ def list_deploy():
     except Exception as e:
         return {"error": f"no local cmds and repo unreachable: {e}"}
 
+def ping_https(url, timeout=8):
+    try:
+        r=urllib.request.urlopen(url, timeout=timeout)
+        return {"target":url,"status":"up","code":r.status}
+    except Exception as e:
+        return {"target":url,"status":"down","err":str(e)[:80]}
+
 def handle(tool, args):
     if tool=="get_matrix_status": return read_matrix()
     if tool=="ping_cloud_web": return {"surfaces":[ping("127.0.0.1",p) for p in (8303,8304,8081)]}
+    if tool=="ping_ai_web": return {"surfaces":[
+        ping_https("https://eon-site.exportdefaultasyncfetchrequestenvconsturl.workers.dev/api/health"),
+        ping_https("https://eon-p2p-cloud.exportdefaultasyncfetchrequestenvconsturl.workers.dev/health")]}
     if tool=="get_deploy_manifest": return {"commands":list_deploy()}
     return {"error":"unknown tool", "tool":tool}
 
@@ -63,7 +73,7 @@ def main():
         class H(BaseHTTPRequestHandler):
             def do_GET(self):
                 if self.path.strip("/").split("?")[0]== "mcp":
-                    r=json.dumps({"tools":["get_matrix_status","ping_cloud_web","get_deploy_manifest"]})
+                    r=json.dumps({"tools":["get_matrix_status","ping_cloud_web","ping_ai_web","get_deploy_manifest"]})
                     self.send_response(200); self.send_header("Content-Type","application/json"); self.end_headers()
                     self.wfile.write(r.encode())
                 else:
