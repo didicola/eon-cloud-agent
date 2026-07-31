@@ -1,0 +1,30 @@
+flag provided but not defined: -genkeys
+Usage of yggdrasil:
+  -address
+    	use in combination with either -useconf or -useconffile, outputs your IPv6 address
+  -autoconf
+    	automatic mode (dynamic IP, peer with IPv6 neighbors)
+  -exportkey
+    	use in combination with either -useconf or -useconffile, outputs your private key in PEM format
+  -genconf
+    	print a new config to stdout
+  -json
+    	print configuration from -genconf or -normaliseconf as JSON instead of HJSON
+  -loglevel string
+    	loglevel to enable (default "info")
+  -logto string
+    	file path to log to, "syslog" or "stdout" (default "stdout")
+  -normaliseconf
+    	use in combination with either -useconf or -useconffile, outputs your configuration normalised
+  -publickey
+    	use in combination with either -useconf or -useconffile, outputs your public key
+  -subnet
+    	use in combination with either -useconf or -useconffile, outputs your IPv6 subnet
+  -useconf
+    	read HJSON/JSON config from stdin
+  -useconffile string
+    	read HJSON/JSON config from specified file path
+  -user string
+    	user (and, optionally, group) to set UID/GID to
+  -version
+    	prints the version of this build

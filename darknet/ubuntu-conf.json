@@ -1,0 +1,19 @@
+{
+  "PrivateKey": "b786d00a2742e11066858745f25682adc717e338e392bb69be1e53c2accf82604d3b1b4b837014fe54b809d421be504a0bdd68f603b3cd2b96a1d9f32cbd6853",
+  "Peers": [],
+  "InterfacePeers": {},
+  "Listen": [],
+  "MulticastInterfaces": [
+    {
+      "Regex": ".*",
+      "Beacon": true,
+      "Listen": true,
+      "Password": ""
+    }
+  ],
+  "AllowedPublicKeys": [],
+  "IfName": "auto",
+  "IfMTU": 65535,
+  "NodeInfoPrivacy": false,
+  "NodeInfo": null
+}
