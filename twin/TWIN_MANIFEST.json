@@ -1,0 +1,60 @@
+{
+  "manifest_version": 1,
+  "twin_id": "opencode-twin-v1",
+  "name": "OpenCode Twin DNA Bundle",
+  "created_at": "2026-07-31T13:33:00Z",
+  "created_by": "didicola (ubuntu host)",
+  "purpose": "Step 4 of the parallel-world build: deliver the full opencode core + architecture + DNA to AI Cloud / AI Web so they can create their OWN twins with their OWN domains, then resend the new twin for install. Free forever.",
+  "dna_sources": [
+    {
+      "machine": "ubuntu",
+      "path": "/home/ricos/.config/opencode/",
+      "components": ["opencode.jsonc", "opencode.json", "AGENTS.md", "agents/"]
+    },
+    {
+      "machine": "termux-samsung",
+      "path": "~/termux-mirror/.config/opencode/",
+      "components": ["opencode.json", "opencode.jsonc", "AGENTS.md", "agents/"]
+    }
+  ],
+  "architecture_docs": [
+    "PARALLEL_WORLD_ARCHITECTURE.md",
+    "AI_CLOUD_ARCHITECTURE.md",
+    "PARALLEL_WORLD_SIGNAL.md",
+    "EON_DREAM.md"
+  ],
+  "core_brain": {
+    "eon_mega_brain_v6.py": "8 brain regions (cortex, prefrontal, hippocampus, thalamus, brainstem, limbic) + 8 cloud workers",
+    "eon_unified.py": "unified AGI entry point"
+  },
+  "model_grid": {
+    "providers": 39,
+    "workers": 8,
+    "models": 668,
+    "services": 151,
+    "routing": "9-tier $0 fallback via blind-proxy :8090",
+    "note": "blind-proxy maps model families to free tier (OpenRouter :free -> freellmapi -> TFG -> Mistral -> HuggingFace -> Cerebras -> SambaNova -> BazaarLink)"
+  },
+  "mesh_topology": {
+    "ubuntu": "master coordinator (eon-master-daemon, heartbeat ubuntu->cloud memory)",
+    "termux-samsung": "node 5 cloud-opencode (blind-proxy :8090, matrix :8201, socat :8443)",
+    "ai_cloud": "cloud-brain-proxy, eon-datacenter (D1+VOL), ai-cloud-space (KV+D1), sovereign-llm, delegate-relay, bot-router, edge-proxy, ghost-swarm-relay, eon-master-bridge, memory-cache",
+    "ai_web": "eon-site, eon-sovereign-site, asi-sovereign-chat, dashboard, asi-aiops-dashboard, asi-parallel-console"
+  },
+  "known_bugs_fixed": [
+    "eon-unity.sh: dead short URL eon-p2p-cloud.workers.dev (NXDOMAIN) -> full workers.dev URL",
+    "Tor dependency: coordinator now runs direct HTTPS (Tor optional)",
+    "task result reporting: /delegate/result now reported properly (was silently dropped)",
+    "heartbeat protocol: ubuntu-heartbeat freshness check now matches DREAM_MEMORY 'created' field"
+  ],
+  "delegation_state": {
+    "issue_1": "Node 5 cloud-opencode DELEGATION AUTHORIZED by didicola (quota, routing, peer id, chameleon IDE)",
+    "step_4": "THIS BUNDLE = the opencode core + arch + DNA for AI Cloud / AI Web to twin",
+    "action_required": "AI Cloud / AI Web: create your own twin with your own domain from this DNA, then resend here for install"
+  },
+  "free_forever": true,
+  "auth": {
+    "cloud_brain_token": "Pi6LNVeqGU_G4YEAxNHyXhczNqRjsmBuzTNt343PQtI",
+    "ai_cloud_space_token": "48e6a9a31a84f5b28d832a2e14dcf470a2ae15b20fbc0bd606e583991385b349"
+  }
+}
