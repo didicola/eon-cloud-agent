@@ -1,0 +1,47 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "eon-matrix": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "EON AGI Cloud",
+      "options": {
+        "baseURL": "http://127.0.0.1:8201/v1",
+        "apiKey": "noop"
+      },
+      "models": {
+        "auto": {
+          "name": "Auto (Matrix)"
+        },
+        "glm-5.2": {
+          "name": "GLM 5.2 (Matrix)"
+        },
+        "claude-opus": {
+          "name": "Claude Opus (Matrix)"
+        },
+        "claude-sonnet-5": {
+          "name": "Claude Sonnet 5 (Intelligent)"
+        },
+        "deepseek-chat": {
+          "name": "DeepSeek Chat (Sovereign)"
+        },
+        "deepseek-reasoner": {
+          "name": "DeepSeek Reasoner (Smart)"
+        },
+        "codestral": {
+          "name": "Codestral (Sovereign)"
+        }
+      }
+    }
+  },
+  "model": "eon-matrix/auto",
+  "mcp": {
+    "eon-coordination": {
+      "type": "local",
+      "enabled": true,
+      "command": [
+        "python3",
+        "/root/eon-cloud-agent/bin/eon-coordination-mcp.py"
+      ]
+    }
+  }
+}
