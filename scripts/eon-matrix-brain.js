@@ -83,18 +83,22 @@ async function probe(entry) {
     const r = await fetchUrl('http://' + entry.host + ':' + entry.port + (entry.path || '/'), 4000);
     return { ...entry, up: r.ok, code: r.code || null, ms: r.ms || null, err: r.err || null, checked: Date.now() };
   }
-  // cloud: probe every route, any 200 wins
-  const results = [];
-  for (const route of entry.routes || []) {
-    const r = await fetchUrl(entry.base + route, 8000);
-    results.push({ route, ok: r.ok, code: r.code, ms: r.ms, err: r.err });
-  }
+  // cloud: probe routes in parallel (any 200 wins), capped at 3 routes each
+  const routes = (entry.routes || ['/']).slice(0, 3);
+  const results = await Promise.all(routes.map(async (route) => {
+    const r = await fetchUrl(entry.base + route, 6000);
+    return { route, ok: r.ok, code: r.code, ms: r.ms, err: r.err };
+  }));
   const okAny = results.some(r => r.ok);
   const best = results.filter(r => r.ok).sort((a, b) => a.ms - b.ms)[0] || null;
   return { ...entry, up: okAny, routes: results, bestRoute: best ? best.route : null, bestMs: best ? best.ms : null, checked: Date.now() };
 }
 
+let ticking = false;
 async function tick() {
+  if (ticking) { log('tick: skip (already running)'); return; }
+  ticking = true;
+  try {
   const discovered = await discoverCloudPeers();
   const dynClouds = Array.from(DYNAMIC.values());
   const allClouds = CLOUDS.concat(dynClouds);
@@ -140,6 +144,7 @@ async function tick() {
   const r = await cloudStore.put('matrix', MAP_KEY, JSON.stringify(map));
   log('map persisted to D1: kv=' + r.kvOk + ' mem=' + r.memOk + ' totals=' + JSON.stringify(map.totals));
   return map;
+  } finally { ticking = false; }
 }
 
 // ─── state ───
@@ -234,7 +239,7 @@ const server = http.createServer(async (req, res) => {
         try { cloud = JSON.parse(body || '{}'); } catch (e) {}
         const r = registerDynamic(cloud);
         send(r.ok ? 200 : 400, r);
-        if (r.ok) tick();
+        if (r.ok) setTimeout(() => { tick().catch(() => {}); }, 100);
       });
       return;
     }
