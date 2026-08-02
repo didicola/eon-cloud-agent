@@ -1,0 +1,32 @@
+{
+  "tick": "2026-08-02 02:54:43 UTC",
+  "surfaces": [
+    {
+      "target": "http://127.0.0.1:8303/health",
+      "ok": false,
+      "err": "Error: connect ECONNREFUSED 127.0.0.1:8303"
+    },
+    {
+      "target": "http://127.0.0.1:8304/health",
+      "ok": false,
+      "err": "Error: connect ECONNREFUSED 127.0.0.1:8304"
+    },
+    {
+      "target": "http://127.0.0.1:8081/health",
+      "ok": false,
+      "err": "Error: connect ECONNREFUSED 127.0.0.1:8081"
+    },
+    {
+      "target": "https://eon-site.exportdefaultasyncfetchrequestenvconsturl.workers.dev/api/health",
+      "code": 200,
+      "ok": true,
+      "ms": 1805
+    },
+    {
+      "target": "https://eon-p2p-cloud.exportdefaultasyncfetchrequestenvconsturl.workers.dev/health",
+      "code": 200,
+      "ok": true,
+      "ms": 1984
+    }
+  ]
+}
