@@ -5,6 +5,7 @@
 'use strict';
 const http = require('http');
 const https = require('https');
+const cloudStore = require('./lib/cloud-store.js');
 
 const PORT = process.env.EON_PAGES_PORT || 8080;
 const CLOUD = process.env.EON_CLOUD_URL || 'https://eon-p2p-cloud.exportdefaultasyncfetchrequestenvconsturl.workers.dev';
@@ -78,23 +79,24 @@ async function cloudGetSite(name, relPath) {
     name + '/' + rel.replace(/^site\//, '')
   ];
   for (const key of candidates) {
-    const url = CLOUD + '/sync/config?type=site&key=' + encodeURIComponent(key);
-    const res = await fetchUpstream(url);
-    if (res.status !== 200) continue;
-    try {
-      const d = JSON.parse(res.body);
-      if (!d.found) continue;
-      return Buffer.from(d.value, 'base64');
-    } catch (e) { continue; }
+    const v = await cloudStore.get('site', key);
+    if (v) return Buffer.from(v, 'base64');
   }
   return null;
 }
 
+let siteRegistry = { at: 0, data: null };
+const KNOWN_SITES = ['eon-hf', 'eon-cloud'];
 async function cloudListSites() {
-  const url = CLOUD + '/sync/config?type=site&key=' + encodeURIComponent('__list__');
-  const res = await fetchUpstream(url);
-  try { const d = JSON.parse(res.body); if (d.found) return JSON.parse(Buffer.from(d.value, 'base64').toString()); } catch (e) {}
-  return [];
+  if (siteRegistry.data && Date.now() - siteRegistry.at < 60000) return siteRegistry.data;
+  const found = [];
+  for (const name of KNOWN_SITES) {
+    const body = await cloudGetSite(name, '');
+    if (body) found.push({ name, desc: '' });
+  }
+  const sites = found.length ? found : [{ name: 'eon-hf', desc: '' }, { name: 'eon-cloud', desc: '' }];
+  siteRegistry = { at: Date.now(), data: sites };
+  return sites;
 }
 
 let modelsCache = { at: 0, data: null };
@@ -180,6 +182,16 @@ const server = http.createServer(async (req, res) => {
   const p = u.pathname;
   log(u.method, p);
   try {
+    if (req.method === 'PUT' && p.startsWith('/site/')) {
+      const parts = p.slice('/site/'.length).split('/').filter(Boolean);
+      const name = parts[0];
+      const rel = parts.slice(1).join('/') || 'index.html';
+      const body = await readBody(req);
+      const ok = await cloudPutSite(name, rel, body);
+      res.writeHead(ok ? 200 : 502, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok, site: name, path: rel, bytes: body.length }));
+      return;
+    }
     if (p === '/' || p === '/index.html') return await serveHome(res);
     if (p === '/hf' || p === '/hf/' || p.startsWith('/hf/')) return await serveHF(res);
     if (p === '/site' || p === '/site/') return await serveSite('', '', res);
@@ -201,6 +213,23 @@ const server = http.createServer(async (req, res) => {
     }
   }
 });
+
+function readBody(req) {
+  return new Promise((resolve) => {
+    let d = '';
+    req.on('data', c => { d += c; if (d.length > 2 * 1024 * 1024) req.destroy(); });
+    req.on('end', () => resolve(d));
+    req.on('error', () => resolve(d));
+  });
+}
+
+async function cloudPutSite(name, rel, body) {
+  const key = name + '/' + rel;
+  const value = Buffer.from(body).toString('base64');
+  const r = await cloudStore.put('site', key, value);
+  log('cloudPutSite', name + '/' + rel, 'bytes=' + body.length, 'kv=' + r.kvOk, 'mem=' + r.memOk);
+  return r.ok;
+}
 
 process.on('unhandledRejection', (e) => { log('unhandledRejection', (e && e.message) || e); });
 
