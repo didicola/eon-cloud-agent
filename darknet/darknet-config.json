@@ -1,27 +1,28 @@
 {
   "mode": "PRIVATE_DARKNET",
   "public_tor_deprecated": true,
+  "status": "LIVE on this box (2026-08-02): node verified, n2n mesh ping 0% loss",
   "nodes": {
     "ubuntu": {
       "public_key": "4d3b1b4b837014fe54b809d421be504a0bdd68f603b3cd2b96a1d9f32cbd6853",
       "private_key": "b786d00a2742e11066858745f25682adc717e338e392bb69be1e53c2accf82604d3b1b4b837014fe54b809d421be504a0bdd68f603b3cd2b96a1d9f32cbd6853",
       "ygg_address": "201:cb13:92d1:f23f:ac06:ad1f:d8af:7906",
       "listen": "tcp://0.0.0.0:51820",
-      "wan_peer": "tcp://<UBUNTU_WAN_ADDR>:51820",
-      "ifname": "yggdrasil-ubuntu",
-      "systemd_service": "ubuntu-yggdrasil.service",
+      "wan_peer": "tcp://10.140.40.103:51820",
+      "ifname": "ygg0",
+      "systemd_service": "yggdrasil-ubuntu.service",
       "config": "ubuntu-peer.hjson"
     },
     "termux": {
       "public_key": "863c7b6b555e254b9113d473be4514fc7ee995b966b2334915a3b38d0d63c4c9",
-      "ygg_address": "200:f387:929:5543:b568:ddd8:5718:8375",
+      "ygg_address": null,
       "peers": [
-        "tcp://<UBUNTU_WAN_ADDR>:51820"
+        "tcp://10.140.40.103:51820"
       ],
       "allowed_public_keys": [
         "4d3b1b4b837014fe54b809d421be504a0bdd68f603b3cd2b96a1d9f32cbd6853"
       ],
-      "ifname": "yggdrasil-termux",
+      "ifname": "ygg1",
       "config": "termux-peer.hjson"
     }
   },
