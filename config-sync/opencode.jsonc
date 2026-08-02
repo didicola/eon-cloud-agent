@@ -27,6 +27,9 @@
         "deepseek-reasoner": {
           "name": "DeepSeek Reasoner (Smart)"
         },
+        "deepseek-v4-flash-free": {
+          "name": "DeepSeek V4 Flash Free (Zen — Unlimited)"
+        },
         "codestral": {
           "name": "Codestral (Sovereign)"
         }

@@ -7,6 +7,7 @@
 #   ~/oc.sh                          launch twin opencode (model auto)
 #   ~/oc.sh --smart                  launch with reasoning model (deepseek-reasoner)
 #   ~/oc.sh --intelligent            launch with top intelligence (claude-sonnet-5)
+#   ~/oc.sh --zen                    launch with DeepSeek V4 Flash Free (unlimited, no limits)
 #   ~/oc.sh --deep-continue          deep continuation chat of last session (smart model)
 #   ~/oc.sh --prompt "<text>"        run one-shot prompt instead of TUI
 #   ~/oc.sh --model <id>             explicit model id
@@ -43,6 +44,7 @@ while [ $# -gt 0 ]; do
     --e2e-only)        LAUNCH=0; MATRIX_PORT=""; shift ;;
     --smart)           MODE=smart; shift ;;
     --intelligent)     MODE=intelligent; shift ;;
+    --zen)             MODE=zen; shift ;;
     --deep-continue)   MODE=smart; DEEP_CONTINUE=1; shift ;;
     --prompt)          PROMPT="$2"; shift 2 ;;
     --model)           MODE=manual; MODEL_ID="$2"; shift 2 ;;
@@ -56,6 +58,7 @@ pick_model() {
   case "$MODE" in
     smart)       echo "deepseek-reasoner" ;;
     intelligent) echo "claude-sonnet-5" ;;
+    zen)         echo "deepseek-v4-flash-free" ;;
     manual)      echo "$MODEL_ID" ;;
     *)           echo "auto" ;;
   esac
