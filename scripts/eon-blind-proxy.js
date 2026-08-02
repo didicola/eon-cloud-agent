@@ -1,12 +1,12 @@
 // eon-blind-proxy.js — EON Blind Proxy v1 (sovereign, keyless, cloud-native)
 // More powerful than earthly blind-proxy: routes through the EON Parallel World
-// cloud (cloud-brain-proxy, eon-site, pollinations) — no earthly API keys,
+// cloud (cloud-brain-proxy, eon-site, cloud-native unified-router) — no earthly API keys,
 // no earthly rate limits, no credentials. Self-contained, zero external deps.
 //
 // Chain (in order):
 //   1. cloud-brain-proxy  (sovereign-cloud, bearer token)
 //   2. eon-site /api/chat  (AI Web)
-//   3. pollinations.ai      (free fallback)
+//   3. cloud-native unified-router  (workers-ai/deepinfra/siliconflow — sovereign)
 //   4. local-brain          (zero upstream tokens)
 //
 // Run:  node eon-blind-proxy.js    (listens :8092 by default, ENV EON_BP_PORT)
@@ -22,7 +22,7 @@ const P2P_CLOUD = process.env.P2P_CLOUD_URL || 'https://eon-p2p-cloud.exportdefa
 const P2P_MODELS = ['deepseek-r1', 'gpt-oss-120b', 'gpt-oss-20b', 'llama-3.3-70b', 'qwen-coder', 'qwq-32b', 'kimi-k2.7', 'llama-4-scout', 'deepseek-r1-32b', 'glm-5.2', 'gemma-4', 'mistral-small', 'codestral', 'phi-4'];
 const EON_SITE = process.env.EON_SITE_URL || 'https://eon-site.exportdefaultasyncfetchrequestenvconsturl.workers.dev/api/chat';
 const EON_SITE_TOKEN = process.env.EON_SITE_TOKEN || '48e6a9a31a84f5b28d832a2e14dcf470a2ae15b20fbc0bd606e583991385b349';
-const POLLINATIONS = 'https://text.pollinations.ai/openai';
+const CLOUD_NATIVE = process.env.EON_CLOUD_NATIVE_MODEL || 'qwen-coder-32b';
 
 const UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
 
@@ -176,7 +176,7 @@ async function matrixBrainOrder() {
       ...(d.ai_clouds || []), ...(d.web_clouds || []),
       ...(d.exit_clouds || []), ...(d.store_clouds || [])
     ].filter(c => c.up).map(c => c.id);
-    const order = ['eon-p2p-cloud', 'cloud-brain-proxy', 'eon-site', 'pollinations'];
+    const order = ['eon-p2p-cloud', 'cloud-brain-proxy', 'eon-site', 'cloud-native'];
     // sort healthy clouds to the front, keep stable order for ties
     const ranked = order.filter(n => healthy.includes(n)).concat(order.filter(n => !healthy.includes(n)));
     brainCache = { at: Date.now(), order: ranked };
@@ -251,18 +251,22 @@ async function viaEonSite(payload) {
   return { content: text.slice(0, 4000), model: 'eon-site', via: 'eon-site' };
 }
 
-// ─── Provider 3: pollinations.ai (free) ───
-async function viaPollinations(payload) {
+// ─── Provider 3: cloud-native unified-router fallback ───
+// Replaces earthly pollinations with the cloud's own unified router (workers-ai /
+// deepinfra / siliconflow / openrouter). Same eon-p2p-cloud endpoint, distinct
+// model id so it answers only when the primary cloud route is busy/slow.
+async function viaCloudNative(payload) {
   const msgs = JSON.parse(JSON.stringify(payload.messages || []));
-  const res = await fetchUpstream(POLLINATIONS,
-    { model: 'openai', messages: msgs, stream: false },
+  const m = payload.model && String(payload.model).toLowerCase().includes('deepseek') ? 'deepseek-r1-32b' : 'qwen-coder-32b';
+  const res = await fetchUpstream(P2P_CLOUD,
+    { model: m, messages: msgs, max_tokens: payload.max_tokens || 2048, stream: false, temperature: payload.temperature ?? 0.7 },
     {}, 45000);
   if (res.status !== 200) return null;
   try {
     const d = JSON.parse(res.body);
     const content = d.choices?.[0]?.message?.content || null;
     if (!content) return null;
-    return { content, model: 'pollinations', via: 'pollinations' };
+    return { content, model: d.model || m, via: 'cloud-native' };
   } catch (e) { return null; }
 }
 
@@ -272,7 +276,7 @@ async function viaLocalBrain(messages) {
   const t = (last || '').trim().toLowerCase();
   if (!last || last.length < 2) return null;
   if (/^(hi|hello|hey|yo)\b/.test(t)) return { content: 'Hello! EON blind-proxy online.', model: 'local-brain', via: 'local' };
-  if (/^(ping|are you there|status|health)$/.test(t)) return { content: 'EON blind-proxy online. Cloud: cloud-brain-proxy + eon-site + pollinations.', model: 'local-brain', via: 'local' };
+  if (/^(ping|are you there|status|health)$/.test(t)) return { content: 'EON blind-proxy online. Cloud: cloud-brain-proxy + eon-site + cloud-native.', model: 'local-brain', via: 'local' };
   if (/who are you|what are you/i.test(t)) return { content: 'I am the EON blind-proxy — sovereign, keyless, routing through the Parallel World cloud.', model: 'local-brain', via: 'local' };
   if (/what time|time is|date is/i.test(t)) return { content: new Date().toUTCString(), model: 'local-brain', via: 'local' };
   if (/summar/i.test(t)) {
@@ -307,7 +311,7 @@ async function routeChat(payload, res) {
     { name: 'eon-p2p-cloud', fn: () => viaP2PCloud(payload) },
     { name: 'cloud-brain-proxy', fn: () => viaCloudBrain(payload) },
     { name: 'eon-site', fn: () => viaEonSite(payload) },
-    { name: 'pollinations', fn: () => viaPollinations(payload) }
+    { name: 'cloud-native', fn: () => viaCloudNative(payload) }
   ];
 
   // MATRIX-BRAIN: consult the neural matrix registry — deprioritize/skip clouds
@@ -419,7 +423,7 @@ const server = http.createServer((req, res) => {
 
   if (req.method === 'GET' && u.pathname === '/v1/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(JSON.stringify({ status: 'ok', provider: 'EON blind-proxy', models: UNIQUE.length, upstream: ['eon-p2p-cloud', 'cloud-brain-proxy', 'eon-site', 'pollinations', 'local-brain'], rotation: 'parallel-race (speed-of-light)' }));
+    return res.end(JSON.stringify({ status: 'ok', provider: 'EON blind-proxy', models: UNIQUE.length, upstream: ['eon-p2p-cloud', 'cloud-brain-proxy', 'eon-site', 'cloud-native', 'local-brain'], rotation: 'parallel-race (speed-of-light)' }));
   }
 
   if (req.method === 'GET' && u.pathname === '/v1/matrix') {
@@ -431,7 +435,7 @@ const server = http.createServer((req, res) => {
         { name: 'eon-p2p-cloud', model: 'deepseek-r1 + 34 native', location: 'Cloudflare Workers AI', strength: 'cloud-native fleet' },
         { name: 'cloud-brain-proxy', model: 'sovereign-cloud', location: 'Cloudflare edge', strength: 'sovereign brain' },
         { name: 'eon-site', model: 'AI Web', location: 'Cloudflare edge', strength: 'web intelligence' },
-        { name: 'pollinations', model: 'gpt-oss-20b', location: 'free mesh', strength: 'zero-key fallback' },
+        { name: 'cloud-native', model: 'qwen-coder-32b', location: 'cloud unified-router', strength: 'sovereign workers-ai/deepinfra fallback' },
         { name: 'local-brain', model: 'local', location: 'Termux', strength: 'zero upstream tokens' }
       ],
       models: UNIQUE.length
@@ -473,5 +477,5 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, '127.0.0.1', () => {
-  console.error('[eon-blind-proxy] :' + PORT + ' — ' + UNIQUE.length + ' models, upstream: cloud-brain-proxy → eon-site → pollinations → local');
+  console.error('[eon-blind-proxy] :' + PORT + ' — ' + UNIQUE.length + ' models, upstream: cloud-brain-proxy → eon-site → cloud-native → local');
 });

@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 // EON blind-proxy :8090 — 523-model OpenAI-compatible egress
 // Self-contained replacement for the lost blind-proxy-lib stack.
-// Routes via AI Cloud (cloud-brain-proxy) then pollinations (free, no key).
+// Routes via AI Cloud (cloud-brain-proxy) then cloud-native unified-router (no earthly key).
 const http = require('http');
 
 const PORT = parseInt(process.env.EON_BLIND_PORT || '8090', 10);
 const CLOUD = 'https://cloud-brain-proxy.exportdefaultasyncfetchrequestenvconsturl.workers.dev/v1/chat/completions';
 const CLOUD_TOKEN = 'Pi6LNVeqGU_G4YEAxNHyXhczNqRjsmBuzTNt343PQtI';
-const FREE = 'https://text.pollinations.ai/openai';
+const CLOUD_NATIVE = 'https://eon-p2p-cloud.exportdefaultasyncfetchrequestenvconsturl.workers.dev/v1/chat/completions';
 const UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
 
 const MODELS = [
@@ -68,10 +68,10 @@ const server = http.createServer((req, res) => {
         if (r.status >= 200 && r.status < 300) { return send(200, JSON.parse(r.text)); }
       } catch (e) { console.error('[blind] cloud fail', e.message); }
       try {
-        const r = await upstream(FREE, null, { model: 'openai', messages }, 45000);
+        const r = await upstream(CLOUD_NATIVE, null, { model: 'qwen-coder-32b', messages, max_tokens: maxTokens }, 45000);
         if (r.status >= 200 && r.status < 300) { return send(200, JSON.parse(r.text)); }
-      } catch (e) { console.error('[blind] free fail', e.message); }
-      return send(502, { error: 'all upstreams failed', note: 'ai-cloud + pollinations unreachable' });
+      } catch (e) { console.error('[blind] cloud-native fail', e.message); }
+      return send(502, { error: 'all upstreams failed', note: 'ai-cloud + cloud-native unreachable' });
     });
     return;
   }
@@ -80,5 +80,5 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, '127.0.0.1', () => {
-  console.log(`blind-proxy :${PORT} — ${MODELS.length} models (AI Cloud + pollinations)`);
+  console.log(`blind-proxy :${PORT} — ${MODELS.length} models (AI Cloud + cloud-native)`);
 });

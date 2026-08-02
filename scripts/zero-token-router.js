@@ -65,7 +65,7 @@ async function routeZeroToken(messages, reqModel) {
     return _openAIResponse('I am EON — the Parallel World sovereign intelligence. Termux twin running blind-proxy :8090, matrix :8201, synced with AI Cloud + AI Web.', reqModel, true);
   }
   if (intent === 'help') {
-    return _openAIResponse('I can route LLM requests across ~520 models via AI Cloud + pollinations, answer simple queries at zero upstream cost, and coordinate with the EON mesh (ai-cloud-space, eon-p2p-cloud, eon-site).', reqModel, true);
+    return _openAIResponse('I can route LLM requests across ~520 models via AI Cloud + cloud-native, answer simple queries at zero upstream cost, and coordinate with the EON mesh (ai-cloud-space, eon-p2p-cloud, eon-site).', reqModel, true);
   }
   if (intent === 'memory') {
     try {

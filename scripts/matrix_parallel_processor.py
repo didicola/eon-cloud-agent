@@ -6,9 +6,9 @@ socks.set_default_proxy(socks.SOCKS5, "127.0.0.1", 9050)
 import socket
 socket.socket = socks.socksocket
 
-# Pollinations.ai is completely free and requires NO API key
-UPSTREAM_URL = "https://text.pollinations.ai/openai"
-MODEL_POOL = ["openai", "mistral", "llama"]
+# Sovereign cloud-native unified router (workers-ai/deepinfra/siliconflow) — no earthly API key
+UPSTREAM_URL = "https://eon-p2p-cloud.exportdefaultasyncfetchrequestenvconsturl.workers.dev/v1/chat/completions"
+MODEL_POOL = ["qwen-coder-32b", "deepseek-r1-32b", "gemma-4-26b"]
 
 def sanitize_prompt(text):
     if not isinstance(text, str): return text

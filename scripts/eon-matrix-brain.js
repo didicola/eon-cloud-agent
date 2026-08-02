@@ -40,8 +40,8 @@ const CLOUDS = [
 ];
 
 const EXTERNAL_FLEET = [
-  { id: 'pollinations', kind: 'external-ai', url: 'https://text.pollinations.ai/openai', health: 'https://text.pollinations.ai/openai' },
-  { id: 'huggingface', kind: 'external-ai', url: 'https://huggingface.co', health: 'https://huggingface.co' },
+  { id: 'deepinfra', kind: 'external-ai', url: 'https://deepinfra.com', health: 'https://deepinfra.com' },
+  { id: 'siliconflow', kind: 'external-ai', url: 'https://siliconflow.com', health: 'https://siliconflow.com' },
 ];
 
 const LOCAL_NODES = [
@@ -95,8 +95,11 @@ async function probe(entry) {
 }
 
 async function tick() {
-  log('tick: probing', CLOUDS.length, 'clouds +', EXTERNAL_FLEET.length, 'external +', LOCAL_NODES.length, 'local nodes');
-  const cloudProbes = await Promise.all(CLOUDS.map(probe));
+  const discovered = await discoverCloudPeers();
+  const dynClouds = Array.from(DYNAMIC.values());
+  const allClouds = CLOUDS.concat(dynClouds);
+  log('tick: probing', allClouds.length, 'clouds (+' + discovered + ' discovered) +', EXTERNAL_FLEET.length, 'external +', LOCAL_NODES.length, 'local nodes');
+  const cloudProbes = await Promise.all(allClouds.map(probe));
   const extProbes = await Promise.all(EXTERNAL_FLEET.map(async (e) => {
     const r = await fetchUrl(e.health, 8000);
     return { ...e, up: r.ok, code: r.code || null, ms: r.ms || null, err: r.err || null, checked: Date.now() };
@@ -106,6 +109,7 @@ async function tick() {
   const map = {
     generated: new Date().toISOString(),
     brain: { node: 'node5', port: PORT, version: '1.0.0' },
+    dynamic: { registered: DYNAMIC.size, discovered: discovered },
     totals: {
       clouds: cloudProbes.filter(c => c.up).length,
       cloudTotal: cloudProbes.length,
@@ -126,6 +130,7 @@ async function tick() {
       { name: 'sync-memory-d1', ok: true, desc: '/sync/memory (ai-cloud-space D1 — unlimited, permanent)' },
       { name: 'upgrade', ok: true, desc: '/upgrade/propose (self-upgrade channel)' },
       { name: 'mesh', ok: false, desc: 'eon-mesh-swarm (built, not deployed)' },
+      { name: 'sovereign-routing', ok: true, desc: 'cloud-native unified-router (workers-ai/deepinfra/siliconflow) — no earthly pollinations' },
     ],
   };
   state.map = map;
@@ -139,6 +144,34 @@ async function tick() {
 
 // ─── state ───
 const state = { map: null, lastTick: null, starting: Date.now() };
+
+// ─── dynamic cloud registry — thousands of clouds can attach ───
+// Any cloud/worker/provider announces itself via POST /matrix/register or the
+// cloud's /p2p/announce; the brain merges it into the neural map on each tick.
+const DYNAMIC = new Map(); // id -> { id, kind, base, routes, addedAt }
+
+function registerDynamic(cloud) {
+  if (!cloud || !cloud.id || !cloud.base) return { ok: false, err: 'need {id, base}' };
+  DYNAMIC.set(cloud.id, { id: cloud.id, kind: cloud.kind || 'ai-cloud', base: cloud.base, routes: cloud.routes || ['/'], addedAt: Date.now() });
+  return { ok: true, id: cloud.id, registered: DYNAMIC.size, note: 'attached to neural matrix' };
+}
+
+async function discoverCloudPeers() {
+  // Ask the p2p-cloud for its registered peers + providers, attach any new cloud.
+  const found = [];
+  try {
+    const res = await fetchUrl('https://eon-p2p-cloud.exportdefaultasyncfetchrequestenvconsturl.workers.dev/p2p/peers', 6000);
+    if (res.ok) {
+      const d = JSON.parse(res.body);
+      const shards = d.shards || [];
+      for (const s of shards) for (const p of (s.peers || [])) {
+        if (p && p.id) found.push({ id: p.id, kind: 'ai-cloud', base: p.url || 'https://' + p.id + '.workers.dev', routes: ['/'] });
+      }
+    }
+  } catch (e) {}
+  for (const c of found) registerDynamic(c);
+  return found.length;
+}
 
 // ─── delegation decision engine ───
 function decideDelegate(task) {
@@ -193,12 +226,24 @@ const server = http.createServer(async (req, res) => {
       });
       return;
     }
+    if (u.pathname === '/matrix/register' && req.method === 'POST') {
+      let body = '';
+      req.on('data', c => body += c);
+      req.on('end', () => {
+        let cloud = {};
+        try { cloud = JSON.parse(body || '{}'); } catch (e) {}
+        const r = registerDynamic(cloud);
+        send(r.ok ? 200 : 400, r);
+        if (r.ok) tick();
+      });
+      return;
+    }
     if (u.pathname === '/matrix/map') return send(200, state.map || { status: 'building' });
     if (u.pathname === '/matrix/summary') {
       const m = state.map;
-      return send(200, m ? { status: 'ok', generated: m.generated, totals: m.totals, brain: m.brain } : { status: 'building' });
+      return send(200, m ? { status: 'ok', generated: m.generated, totals: m.totals, brain: m.brain, dynamic: m.dynamic } : { status: 'building' });
     }
-    if (u.pathname === '/matrix/status') return send(200, { status: 'ok', uptime: Date.now() - state.starting, lastTick: state.lastTick, port: PORT, node: 'node5' });
+    if (u.pathname === '/matrix/status') return send(200, { status: 'ok', uptime: Date.now() - state.starting, lastTick: state.lastTick, port: PORT, node: 'node5', dynamic: DYNAMIC.size });
     if (u.pathname === '/health' || u.pathname === '/') return send(200, { status: 'ok', service: 'eon-matrix-brain', node: 'node5', port: PORT });
     send(404, { error: 'not found' });
   } catch (e) { send(500, { error: e.message }); }
