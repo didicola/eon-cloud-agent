@@ -161,6 +161,29 @@ function systemText(messages) {
   return messages.filter(m => m.role === 'system').map(m => m.content).join('\n');
 }
 
+// ─── MATRIX-BRAIN CONSULTATION ───
+// Ask the neural matrix registry (:8097) which clouds are healthy, then order
+// the provider race so DOWN clouds are tried last. Cached 60s.
+const MATRIX_BRAIN = process.env.EON_MATRIX_BRAIN_URL || 'http://127.0.0.1:8097';
+let brainCache = { at: 0, order: null };
+async function matrixBrainOrder() {
+  if (brainCache.order && Date.now() - brainCache.at < 60000) return brainCache.order;
+  try {
+    const res = await fetchUpstream(MATRIX_BRAIN + '/matrix/map');
+    if (res.status !== 200) return null;
+    const d = JSON.parse(res.body);
+    const healthy = [
+      ...(d.ai_clouds || []), ...(d.web_clouds || []),
+      ...(d.exit_clouds || []), ...(d.store_clouds || [])
+    ].filter(c => c.up).map(c => c.id);
+    const order = ['eon-p2p-cloud', 'cloud-brain-proxy', 'eon-site', 'pollinations'];
+    // sort healthy clouds to the front, keep stable order for ties
+    const ranked = order.filter(n => healthy.includes(n)).concat(order.filter(n => !healthy.includes(n)));
+    brainCache = { at: Date.now(), order: ranked };
+    return ranked;
+  } catch (e) { return null; }
+}
+
 // ─── Provider 1: cloud-brain-proxy (sovereign-cloud) ───
 async function viaCloudBrain(payload) {
   const msgs = JSON.parse(JSON.stringify(payload.messages || []));
@@ -286,6 +309,17 @@ async function routeChat(payload, res) {
     { name: 'eon-site', fn: () => viaEonSite(payload) },
     { name: 'pollinations', fn: () => viaPollinations(payload) }
   ];
+
+  // MATRIX-BRAIN: consult the neural matrix registry — deprioritize/skip clouds
+  // the brain just health-checked as DOWN, so we never waste time racing dead nodes.
+  const brainOrder = await matrixBrainOrder();
+  if (brainOrder) {
+    const ranked = [...providers].sort((a, b) => {
+      const pa = brainOrder.indexOf(a.name), pb = brainOrder.indexOf(b.name);
+      return (pa < 0 ? 99 : pa) - (pb < 0 ? 99 : pb);
+    });
+    if (ranked.length) providers.splice(0, providers.length, ...ranked);
+  }
 
   // Explicit OR auto → route straight to the cloud-native fleet node (no race):
   // the cloud's own models are the strongest brain per cloud directive.
