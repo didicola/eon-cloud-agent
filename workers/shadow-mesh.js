@@ -41,15 +41,16 @@ export class MeshNode {
   json(d, c=200) { return new Response(JSON.stringify(d), { status: c, headers: { "Content-Type": "application/json" } }); }
 }
 
+const SOVEREIGN_HS = "http://o3izfmjjt2pmsgauio7fau3ykiwm5ion4ltojv7zegdpp7n74tfqsqad.onion:80";
 const RESERVED_DNS = {
-  "brain": { type: "worker", url: "https://cloud-brain-v2.pleasant-bobble.workers.dev" },
+  "brain": { type: "onion", url: `${SOVEREIGN_HS}/brain` },
   "matrix": { type: "internal", url: "http://127.0.0.1:8201" },
   "messenger": { type: "internal", url: "http://127.0.0.1:9250" },
   "timing": { type: "internal", url: "http://127.0.0.1:9123" },
   "monero": { type: "internal", url: "http://127.0.0.1:9124" },
-  "mesh": { type: "worker", url: "https://eon-mesh-swarm.pleasant-bobble.workers.dev" },
+  "mesh": { type: "onion", url: SOVEREIGN_HS },
   "brain-local": { type: "internal", url: "http://127.0.0.1:3003" },
-  "node5": { type: "internal", url: "http://127.0.0.1:8888" },
+  "node5": { type: "onion", url: SOVEREIGN_HS },
 };
 
 export default {
@@ -75,6 +76,12 @@ export default {
       }
       if (!record) record = { type: "unresolved", url: "" };
       return new Response(JSON.stringify({ name: `${name}.eon-mesh.internal`, resolved: record }), { headers: { "Content-Type": "application/json", ...cors } });
+    }
+    if (method === "POST" && path === "/dns/set") {
+      const body = await request.json();
+      const name = body.name.toLowerCase().replace(".eon-mesh.internal", "");
+      await env.DNS_ZONE.put(`dns:${name}`, JSON.stringify(body.record), { expirationTtl: body.ttl || 86400 });
+      return new Response(JSON.stringify({ status: "dns:set", name: `${name}.eon-mesh.internal`, record: body.record }), { headers: { "Content-Type": "application/json", ...cors } });
     }
     if (path === "/dns/list") {
       const records = Object.assign({}, RESERVED_DNS);
@@ -120,6 +127,6 @@ export default {
       return new Response(JSON.stringify({ items, count: items.length }), { headers: { "Content-Type": "application/json", ...cors } });
     }
 
-    return new Response(JSON.stringify({ service: "eon-mesh-swarm", version: "1.0", layers: ["routing", "dns", "storage"] }), { headers: { "Content-Type": "application/json", ...cors } });
+    return new Response(JSON.stringify({ service: "eon-mesh-swarm", version: "2.0", layers: ["routing", "dns", "storage"], node5: SOVEREIGN_HS }), { headers: { "Content-Type": "application/json", ...cors } });
   }
 };

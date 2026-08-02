@@ -1,13 +1,14 @@
 #!/bin/bash
-MESH="https://eon-mesh-swarm.pleasant-bobble.workers.dev"
+MESH="${MESH_URL:-http://127.0.0.1:8787}"
 NODE_ID="node5"
 INTERVAL=${1:-300}
+ONION="o3izfmjjt2pmsgauio7fau3ykiwm5ion4ltojv7zegdpp7n74tfqsqad.onion"
 
-echo "[mesh] Starting daemon for $NODE_ID (${INTERVAL}s)"
+echo "[mesh] Starting daemon for $NODE_ID (${INTERVAL}s) -> $MESH"
 
 curl -s -A "Mozilla/5.0" -X POST "$MESH/mesh/register?node_id=$NODE_ID" \
   -H "Content-Type: application/json" \
-  -d '{"node_id":"node5","ip":"127.0.0.1","capabilities":["compute","storage","relay","dns","matrix","messenger","timing","monero","cloud-brain"]}' \
+  -d "{\"node_id\":\"node5\",\"ip\":\"127.0.0.1\",\"addr\":\"$ONION\",\"capabilities\":[\"compute\",\"storage\",\"relay\",\"dns\",\"matrix\",\"messenger\",\"timing\",\"monero\",\"cloud-brain\"],\"services\":{\"mesh\":8787,\"matrix\":8201,\"messenger\":9250}}" \
   -m 10 > /dev/null 2>&1 && echo "[mesh] Registered"
 
 CYCLE=0
