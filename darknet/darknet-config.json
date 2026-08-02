@@ -1,7 +1,7 @@
 {
   "mode": "PRIVATE_DARKNET",
   "public_tor_deprecated": true,
-  "status": "LIVE on this box (2026-08-02): node verified, n2n mesh ping 0% loss",
+  "status": "LIVE + TWIN-PUSH VERIFIED (2026-08-02): node verified, n2n mesh ping 0% loss, brain->twin push over ygg = TWIN-PUSH-RECEIVED-OVER-N2N",
   "nodes": {
     "ubuntu": {
       "public_key": "4d3b1b4b837014fe54b809d421be504a0bdd68f603b3cd2b96a1d9f32cbd6853",
@@ -15,7 +15,8 @@
     },
     "termux": {
       "public_key": "863c7b6b555e254b9113d473be4514fc7ee995b966b2334915a3b38d0d63c4c9",
-      "ygg_address": null,
+      "private_key": "92f3e585bc24caaca43565e0df67dc5e827f4d20c50645a7bae601174d2d9480863c7b6b555e254b9113d473be4514fc7ee995b966b2334915a3b38d0d63c4c9",
+      "ygg_address": "200:f387:929:5543:b568:ddd8:5718:8375",
       "peers": [
         "tcp://10.140.40.103:51820"
       ],
@@ -23,12 +24,17 @@
         "4d3b1b4b837014fe54b809d421be504a0bdd68f603b3cd2b96a1d9f32cbd6853"
       ],
       "ifname": "ygg1",
-      "config": "termux-peer.hjson"
+      "systemd_service": "yggdrasil-termux.service (mirror on this box; real = termux phone)",
+      "config": "termux-peer.hjson",
+      "admin_listen": "unix:///var/run/yggdrasil-termux/yggdrasil.sock"
     }
   },
   "matrix_patch": {
     "darknet_mode_env": "DARKNET_MODE=1",
-    "behavior": "Internal ops route over Yggdrasil IPv6 peer addresses. External AI still -> cloud-bridge -> our cloud via Tor."
+    "behavior": "Internal ops route over Yggdrasil IPv6 peer addresses. External AI still -> cloud-bridge -> our cloud via Tor.",
+    "brain_ygg_listen": "[201:cb13:92d1:f23f:ac06:ad1f:d8af:7906]:8710",
+    "twin_ygg_listen": "[200:f387:929:5543:b568:ddd8:5718:8375]:45579",
+    "brain_push_twin": "POST http://127.0.0.1:8710/matrix/twin {twin_port: 45579} -> n2n"
   },
-  "note": "Keys never touch public Tor. Deploy on real ubuntu LXC node 5 + termux phone (TUN-capable kernels)."
+  "note": "Keys never touch public Tor. Deploy on real ubuntu LXC node 5 + termux phone (TUN-capable kernels). Admin sockets are per-node (ubuntu: /var/run/yggdrasil, termux: /var/run/yggdrasil-termux)."
 }

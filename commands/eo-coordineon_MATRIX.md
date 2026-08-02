@@ -19,5 +19,12 @@
   /matrix/darknet = PRIVATE_DARKNET topology (self+twin)
   client resolve_brain() prefers ygg address, proxy-less (bypass Privoxy 8118)
   E2E: client -> brain-over-ygg -> cloud-brain-proxy -> DARKNET-BRAIN-OK
+- **TWIN PUSH VERIFIED (brain -> twin over n2n)**
+  termux node ygg1 up: addr 200:f387:929:5543:b568:ddd8:5718:8375 (key 863c7b6b..)
+  n2n mesh ping ubuntu(ygg0)<->termux(ygg1): 0% loss, 0.076ms RTT
+  client binds [200:f387..]:45579 (own ygg address) in DARKNET_MODE
+  POST /matrix/twin {twin_port} -> brain forward_to_twin -> twin client over ygg
+  E2E: brain -> [200:f387..]:45579 -> TWIN-PUSH-RECEIVED-OVER-N2N (HTTP 200)
+  admin sockets: ubuntu /var/run/yggdrasil, termux /var/run/yggdrasil-termux
   DARKNET_MODE routes internal twin traffic over Yggdrasil, no Tor, no earth
 - next tick in 60s (self-healing)
