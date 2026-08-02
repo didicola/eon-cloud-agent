@@ -14,5 +14,10 @@
   node addr 201:cb13:92d1:f23f:ac06:ad1f:d8af:7906, listener tcp://0.0.0.0:51820
   n2n mesh ping (node<->node over ygg0/ygg2): 0% loss, 0.044ms RTT
   termux-peer: tcp://10.140.40.103:51820 (ygg1, AllowedPublicKeys=ubuntu key)
-  DARKNET_MODE=1 routes internal twin traffic over Yggdrasil, no Tor, no earth
+- **DARKNET_MODE=1 WIRED + E2E VERIFIED** (brain + termux client)
+  brain listens on [201:cb13..]:8710 (n2n overlay) + 127.0.0.1:8710
+  /matrix/darknet = PRIVATE_DARKNET topology (self+twin)
+  client resolve_brain() prefers ygg address, proxy-less (bypass Privoxy 8118)
+  E2E: client -> brain-over-ygg -> cloud-brain-proxy -> DARKNET-BRAIN-OK
+  DARKNET_MODE routes internal twin traffic over Yggdrasil, no Tor, no earth
 - next tick in 60s (self-healing)
