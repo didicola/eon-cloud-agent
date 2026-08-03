@@ -1,16 +1,25 @@
 import { createServer } from 'node:http';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, renameSync } from 'node:fs';
+
+// ── disk-backed KV: sovereign persistent store (mem-map for reads, write-through journal) ──
+const STATE = '/root/eon-cloud-agent/state/kv.json';
+mkdirSync('/root/eon-cloud-agent/state', { recursive: true });
+const DISK = (() => { try { return JSON.parse(readFileSync(STATE, 'utf8')); } catch { return {}; } })();
+const persist = () => { const tmp = STATE + '.tmp'; writeFileSync(tmp, JSON.stringify(DISK)); renameSync(tmp, STATE); };
+let writeQueue = Promise.resolve();
+const enqueuePersist = () => { writeQueue = writeQueue.then(() => new Promise(res => setTimeout(res, 5))).then(persist).catch(() => {}); };
 
 const KV = class {
-  constructor(prefix) { this.m = new Map(); this.prefix = prefix; }
-  async put(k, v, opts) {
-    const kv = JSON.stringify({ v, meta: opts?.metadata || null, exp: opts?.expirationTtl ? Date.now() + opts.expirationTtl * 1000 : null, ts: Date.now() });
-    this.m.set(`${this.prefix}${k}`, kv);
+  constructor(prefix) { this.m = DISK; this.prefix = prefix; }
+  async put(k, value, opts) {
+    const kv = JSON.stringify({ v: value, meta: opts?.metadata || null, exp: opts?.expirationTtl ? Date.now() + opts.expirationTtl * 1000 : null, ts: Date.now() });
+    this.m[`${this.prefix}${k}`] = kv;
+    enqueuePersist();
   }
-  async get(k) { const r = this.m.get(`${this.prefix}${k}`); if (!r) return null; const { v, exp } = JSON.parse(r); if (exp && exp < Date.now()) { this.m.delete(`${this.prefix}${k}`); return null; } return v; }
-  async getWithMetadata(k) { const r = this.m.get(`${this.prefix}${k}`); if (!r) return { value: null, metadata: null }; const { v, meta, exp } = JSON.parse(r); if (exp && exp < Date.now()) { this.m.delete(`${this.prefix}${k}`); return { value: null, metadata: null }; } return { value: v, metadata: meta }; }
-  async delete(k) { this.m.delete(`${this.prefix}${k}`); }
-  async list({ prefix = '' } = {}) { const keys = []; for (const k of this.m.keys()) { if (k.startsWith(`${this.prefix}${prefix}`)) keys.push({ name: k.slice(this.prefix.length) }); } return { keys }; }
+  async get(k) { const r = this.m[`${this.prefix}${k}`]; if (!r) return null; const { v, exp } = JSON.parse(r); if (exp && exp < Date.now()) { delete this.m[`${this.prefix}${k}`]; enqueuePersist(); return null; } return v; }
+  async getWithMetadata(k) { const r = this.m[`${this.prefix}${k}`]; if (!r) return { value: null, metadata: null }; const { v, meta, exp } = JSON.parse(r); if (exp && exp < Date.now()) { delete this.m[`${this.prefix}${k}`]; enqueuePersist(); return { value: null, metadata: null }; } return { value: v, metadata: meta }; }
+  async delete(k) { delete this.m[`${this.prefix}${k}`]; enqueuePersist(); }
+  async list({ prefix = '' } = {}) { const keys = []; for (const k of Object.keys(this.m)) { if (k.startsWith(`${this.prefix}${prefix}`)) keys.push({ name: k.slice(this.prefix.length) }); } return { keys }; }
 };
 
 const memKV = (p) => new KV(p);
