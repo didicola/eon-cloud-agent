@@ -1,0 +1,27 @@
+name = "eon-neural-web"
+main = "src/index.js"
+compatibility_date = "2026-07-31"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+# KV namespaces (create via: npx wrangler kv namespace create NEURAL_KV)
+# Single namespace, prefixed keys — matches the 100k/1k/day free-tier budget.
+[[kv_namespaces]]
+binding = "NEURAL_KV"
+id = "REPLACE_WITH_NEURAL_KV_ID"
+
+# Optional: mesh state / dns / storage can share NEURAL_KV. If you want separate
+# Durable-Object mesh, enable below (MeshNode class is defined in the worker).
+# [durable_objects]
+# bindings = [{ name = "MESH_NODES", class_name = "MeshNode" }]
+#
+# [[migrations]]
+# tag = "v1"
+# new_sqlite_classes = ["MeshNode"]
+
+[vars]
+EON_NODE = "node5"
+EON_MESH_ONION = "http://o3izfmjjt2pmsgauio7fau3ykiwm5ion4ltojv7zegdpp7n74tfqsqad.onion:80"
+
+[observability]
+enabled = true
