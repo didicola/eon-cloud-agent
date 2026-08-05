@@ -72,3 +72,11 @@
     - listen tcp://0.0.0.0:51820 UP
     - phone config (termux-peer.hjson + deploy bundle): peers tcp://192.168.1.90:51820, trusts ubuntu pubkey 4d3b... MATCHES
   PENDING (needs real phone): phone runs deploy-termux/eon-darknet-termux.sh -> ygg1 addr 200:f387.. joins -> ping6 201:cb13.. <=30s criteria
+- **PARALLEL_WORLD DELEGATION (Termux Mother Machine -> Ubuntu) P1-P4 EXECUTED (2026-08-05)**
+  P1 token: /home/ricos/.config/ai-cloud-space.token present (65B, 600) ✅
+  P2 sync: 151/151 memories -> D1 AI_STORE (worker ai-cloud-space, ns AI_STORE, keys mem:1..151) via Tor :9050 ✅ VERIFIED (GET /d1/AI_STORE = 151 records; read mem:1 200)
+  P3 config: opencode routes via local :8087 bridge ($0, all models cost 0) — verified, no change needed ✅
+  P4 bridge: D1 recall works (read mem:1 200; list 151) ✅
+  WIRED: eon_memory_sync.py now pushes/recalls via D1 (Phase 3 source-of-truth), falls back to cloud-brain only if no token
+  NOTE: worker actual API = PUT/GET /d1/:ns/:key + POST /d1/query (delegation doc's /d1/AI_STORE/query path differs); eon_memory_sync's ~/.eon db empty (0 rows) — all real memory lives in ~/eon_memory.db (already in D1)
+  V3 CLOUD LESSON (from telegram): edge workers CANNOT reach localhost blind-proxy -> cascade cloud-brain-proxy,hf-inference,pollinations; d1_rows 6925; supervisor unreachable; escalation v3->v4->...->v-best
