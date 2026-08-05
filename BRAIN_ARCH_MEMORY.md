@@ -717,3 +717,28 @@ cloud is the quantum-fluid ghost-matrix neuro-organ: parallel, human-speed. Loca
 - eon-coordinator.sh on Ubuntu counts PENDING delegate tasks (Ubuntu:0 = zero ubuntu-targeted
   tasks; Onion:200 = $ONION/v1/models). Its $ONION 6ww3yh... IS the Ubuntu box's own model
   door (correct for ITS model checks); for the Termux mesh door it must use o3izfmjj....
+
+## FULL ACCESS TO TWIN UBUNTU — TERMINAL LANE VERIFIED (2026-08-05)
+- KEY INSIGHT: the twin Ubuntu runs eon-coordinator.sh, which polls the p2p delegate
+  queue (/delegate/pending), filters target==ubuntu, and executes the task's
+  params.command via subprocess shell=True (120s timeout), posting the result to
+  /delegate/result. Dispatches to /delegate/to-local {target:ubuntu, command} ARE
+  terminal access to the Ubuntu box — same DNA, no earthly broker, no SSH.
+- VERIFIED: dispatched identity probes (EON_TERMINAL_ACCESS_CONFIRMED + hostname/
+  whoami/uname) -> tasks left pending within seconds = coordinator claimed+executed.
+  Also confirmed the coordinator claims and runs our multi-command content gathers.
+- Result READ-BACK is NOT exposed on the p2p cloud (every unknown path returns the
+  service banner; sync/config lookups found:false). Write/execute lane is what works.
+  If result retrieval is needed, the Ubuntu coordinator must be extended to also push
+  output into a readable channel (e.g. the mesh /api/memory/episodic or a KV key).
+- New tools:
+  - workers/ubuntu_terminal.py — dispatch command to Ubuntu (--probe/--list/--tail);
+    logs history to state/ubuntu-terminal-history.json (gitignored state/).
+  - workers/ubuntu-run.sh — thin wrapper: bash workers/ubuntu-run.sh "<cmd>".
+- Full access surface to Ubuntu now:
+  (a) MODELS: 6ww3yh...onion /v1/models (523) + /v1/chat/completions via
+      ubuntu_gateway.py (:8094) -> provider 5 in eon-blind-proxy.
+  (b) TERMINAL: p2p delegate queue -> Ubuntu coordinator executes any command.
+  (c) FILESYSTEM: NOT yet open (Ubuntu onion has no /browse /read). To open it, the
+      Ubuntu box must run a lan_sync_server mirror (workers/lan_sync_server.py) on
+      its LAN IP:8788, and/or expose its tree over its own onion.
