@@ -11,7 +11,7 @@ CHAT_ID = "6663994526"
 HEARTBEAT_INTERVAL = 15  # seconds
 FAILURE_THRESHOLD = 3    # missed heartbeats = dead (45 seconds)
 
-MACHINE_ID = os.environ.get("EON_MACHINE_ID", "termux")
+MACHINE_ID = os.environ.get("EON_MACHINE_ID", "ubuntu")
 DB_PATH = os.path.expanduser("~/.eon/heartbeat.db")
 
 def init_db():
