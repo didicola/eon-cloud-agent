@@ -28,6 +28,7 @@ import argparse
 import json
 import os
 import shutil
+import socket
 import subprocess
 import sys
 import time
@@ -42,8 +43,53 @@ DOC_SOURCES = os.environ.get("EON_DOC_SOURCES",
     "/root/eon-cloud-agent/SOVEREIGN_PLAN.md," +
     "/root/0.md").split(",")
 MESH = os.environ.get("EON_MESH", "http://127.0.0.1:8787")
+P2P_CLOUD = os.environ.get("EON_P2P_CLOUD", "https://eon-p2p-cloud.exportdefaultasyncfetchrequestenvconsturl.workers.dev")
+DELEGATE_AGENTS = os.environ.get("EON_ROUND_DELEGATE_AGENTS",
+    "researcher,planner,reasoning,summarizer,understand-anything").split(",")
+TOR_SOCKS = os.environ.get("EON_TOR_SOCKS", "127.0.0.1:9050")
 INTERVAL = int(os.environ.get("EON_ROUND_INTERVAL", "300"))   # 5 min
 FLAP_LIMIT = int(os.environ.get("EON_ROUND_FLAP", "6"))       # max repairs per cycle
+
+
+def _socks_connect(host, port, timeout=60):
+    sh, sp = TOR_SOCKS.split(":")
+    s = socket.create_connection((sh, int(sp)), timeout)
+    s.sendall(b"\x05\x01\x00")
+    r = s.recv(2)
+    if r != b"\x05\x00":
+        s.close()
+        raise IOError("socks handshake failed")
+    hb = host.encode()
+    if len(hb) > 255:
+        s.close()
+        raise IOError("host too long")
+    s.sendall(b"\x05\x01\x00\x03" + bytes([len(hb)]) + hb + int(port).to_bytes(2, "big"))
+    r = s.recv(10)
+    if len(r) < 2 or r[1] != 0:
+        s.close()
+        raise IOError("socks connect failed")
+    return s
+
+
+def _socks_json(method, path, body=None, timeout=60):
+    """HTTPS JSON call over the Tor SOCKS tunnel (no earthly broker).
+    Uses curl --socks5-hostname (the proven coordinator pattern): the p2p cloud is
+    HTTPS, so the TLS handshake happens inside the tunnel — a raw socket can't."""
+    import subprocess as sp
+    cmd = ["curl", "-s", "--socks5-hostname", TOR_SOCKS, "--max-time", str(timeout),
+           "-X", method, "-w", "\n%{http_code}", P2P_CLOUD + path,
+           "-H", "Content-Type: application/json"]
+    if body is not None:
+        cmd += ["-d", json.dumps(body)]
+    try:
+        out = sp.run(cmd, capture_output=True, text=True, timeout=timeout + 5).stdout
+    except Exception as e:
+        return 0, {"error": str(e)}
+    head, _, code = out.rpartition("\n")
+    try:
+        return int(code or 0), json.loads(head)
+    except Exception:
+        return int(code or 0), head
 
 
 def _headers():
@@ -198,6 +244,35 @@ def _kv_put(key, value):
         return r.status
 
 
+def delegate_round():
+    """C. DELEGATION ROUND — push parallel neuro-tasks into the sovereign cloud
+    delegate queue (eon-p2p-cloud /delegate/to-cloud). The cloud matrix races them
+    in parallel (millisecond-class, human-speed quantum-fluid brain). This is the
+    'make the necessary delegations' lane: local stays thin, the cloud does the
+    heavy parallel thinking. Rotation-tolerant: each cycle samples a fresh agent
+    mix; a failing cloud never blocks the round."""
+    agents = [a.strip() for a in DELEGATE_AGENTS if a.strip()]
+    results = []
+    for i, agent in enumerate(agents):
+        prompt = ("EON round-matrix self-sync tick. Produce a short insight "
+                  f"(<80 words) for the sovereign mesh from the perspective of "
+                  f"agent {agent}. Focus on: health, memory, delegation.")
+        try:
+            st, d = _socks_json("POST", "/delegate/to-cloud",
+                                {"agent_type": agent, "prompt": prompt}, timeout=45)
+            tid = d.get("task_id") if isinstance(d, dict) else None
+            answer = d.get("result") if isinstance(d, dict) else None
+            results.append({"agent": agent, "ok": st == 200,
+                            "task_id": tid,
+                            "ms": "cloud-parallel" if (st == 200 and tid) else "fail",
+                            "answer_preview": (str(answer)[:80] if answer else None)})
+        except Exception as e:
+            results.append({"agent": agent, "ok": False, "error": str(e)[:80]})
+        if i < len(agents) - 1:
+            time.sleep(1)  # gentle stagger so the cloud matrix can truly parallelize
+    return results
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--once", action="store_true")
@@ -207,9 +282,12 @@ def main():
         docs = sync_docs()
         twin = sync_twin_pull()
         fixes, card = self_fix_round()
+        delegates = delegate_round()
         summary = {"docs": [d.get("status") for d in docs],
                    "twin": twin.get("status"),
                    "down": card["down"], "repairs": card["repairs"],
+                   "delegations": [d.get("ok") for d in delegates],
+                   "delegated_agents": [d.get("agent") for d in delegates if d.get("ok")],
                    "services_ok": sum(1 for r in fixes if r.get("name") and r.get("ok"))}
         print(f"[round-matrix] {json.dumps(summary)}")
         if args.once:

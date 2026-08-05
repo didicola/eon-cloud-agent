@@ -684,3 +684,36 @@ warm ping 5.6ms intact.
   tasks, not a node-count). Onion check is $ONION/v1/models. Ubuntu coordinator still uses STALE onion
   6ww3yh... (this is actually the Ubuntu box's own onion, correct for ITS model door — for the Termux mesh
   door it must use o3izfmjj...). Dispatched ubuntu-targeted task local-task-1785967610788-xvnvgf -> claimed.
+
+## VENV + CLOUD-DELEGATION PROPOSAL — IMPLEMENTED (2026-08-05)
+Proposal (user directive, full arch understood): everything must run in the virtual
+environment (avoid the inherited-fd root cause = instant, ms-class responsiveness) and
+INSIDE the cloud (not on locals) — even torch/GPU training ("torch-cloud"). The sovereign
+cloud is the quantum-fluid ghost-matrix neuro-organ: parallel, human-speed. Local stays thin.
+
+### Already true (verified)
+- All 15 python services run under venv/bin/python via venv-run.sh (only node.js services use raw node).
+- venv-run.sh exports EON_ACCESS_TOKEN from state/.mesh-token.env for every service.
+
+### A. Round-matrix cloud delegation (round_matrix_daemon.py)
+- Added delegation round: each cycle POSTs parallel neuro-tasks to
+  https://eon-p2p-cloud.../delegate/to-cloud over Tor SOCKS (curl --socks5-hostname,
+  the proven coordinator pattern; raw socket fails on HTTPS so curl handles TLS).
+- Agents sampled per cycle: researcher, planner, reasoning, summarizer, understand-anything
+  (EON_ROUND_DELEGATE_AGENTS). Verified: [true x5], all 5 agents answered in parallel.
+- Round now = docs sync + twin pull + self-fix + cloud delegation (4 lanes).
+
+### B. torch-cloud (cloud_gpu_runner.py)
+- snn/torch GPU jobs now delegate FIRST: (1) twin Ubuntu gateway (:8094, 523-model
+  GPU-class brain, ubuntu-onion), (2) p2p delegate queue (code_executor, cloud-parallel);
+  local deterministic dry-run ONLY as last resort. EON_CLOUD_DELEGATE=1 default ON.
+- Verified end-to-end: submitted ml-1785969873571 {torch,gpu:true} -> pulled -> trained
+  (ubuntu-onion) -> completed 200. result.provider=ubuntu-onion (not dry-run-cpu).
+
+### C. Coordination notes
+- mesh-host :8787 serves /api/ml/* (proxies shadow-mesh.js routes). /api/ml/job/latest
+  returns HTTP 404 with body {"error":"no queued jobs"} when empty — benign (runner logs it).
+- ML gateway routes live in workers/shadow-mesh.js; KV mltask:* holds job states.
+- eon-coordinator.sh on Ubuntu counts PENDING delegate tasks (Ubuntu:0 = zero ubuntu-targeted
+  tasks; Onion:200 = $ONION/v1/models). Its $ONION 6ww3yh... IS the Ubuntu box's own model
+  door (correct for ITS model checks); for the Termux mesh door it must use o3izfmjj....

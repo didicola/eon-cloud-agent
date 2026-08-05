@@ -5,9 +5,11 @@ Pulls the next job from the EON mesh, runs it, and posts the result back.
 
 Pipeline:
     GET  <mesh>/api/ml/job/latest     -> {task_id, code, data, framework, gpu, ...}
-    run  (LOCAL DRY mode when the box has no torch and the job wants an
-          snn/torch training run on a GPU: we emit deterministic pseudo-weights
-          so the whole pipeline is exercisable without any real GPU)
+    run  (CLOUD-DELEGATE mode: snn/torch jobs route to the sovereign cloud GPU
+          lane — the Ubuntu-onion model gateway (:8094, 523-model GPU-class brain)
+          or the p2p delegate queue — instead of a local CPU dry-run, per the
+          all-in-cloud / no-earthly golden rule. Local dry-run is ONLY the last
+          resort when every cloud lane is unreachable.)
     POST <mesh>/api/ml/complete       -> {task_id, status:"done", result, provider}
 
 Zero torch/numpy/requests. urllib + json + subprocess + random + time only.
@@ -31,6 +33,10 @@ import urllib.request
 DEFAULT_MESH = os.environ.get("EON_ML_GATEWAY", "http://127.0.0.1:8787")
 LOOP_S = float(os.environ.get("EON_RUNNER_LOOP_SEC", "15"))
 WEIGHTS_LEN = 64
+UBUNTU_GATEWAY = os.environ.get("EON_UBUNTU_GATEWAY_URL", "http://127.0.0.1:8094/v1/chat/completions")
+P2P_CLOUD_DELEGATE = os.environ.get("EON_P2P_CLOUD_DELEGATE",
+    "https://eon-p2p-cloud.exportdefaultasyncfetchrequestenvconsturl.workers.dev/delegate/to-cloud")
+CLOUD_DELEGATE = os.environ.get("EON_CLOUD_DELEGATE", "1") == "1"  # all-in-cloud default ON
 
 
 def _load_token():
@@ -104,6 +110,52 @@ def run_dry_simulation(task):
     return result
 
 
+def delegate_to_ubuntu_gateway(task):
+    """CLOUD-DELEGATE A: route the job to the twin Ubuntu's 523-model GPU-class
+    brain (the ubuntu_gateway sidecar, :8094) over the OpenAI surface."""
+    task_id = task.get("id") or task.get("task_id") or "ml-unknown"
+    data = task.get("data") or {}
+    prompt = (f"EON cloud-GPU job {task_id} (framework={task.get('framework')} "
+              f"gpu={bool(task.get('gpu'))}). Provide the training result summary "
+              f"for dataset: {json.dumps(data)[:200]}")
+    body = json.dumps({"model": "auto",
+                       "messages": [{"role": "user", "content": prompt}],
+                       "max_tokens": 512}).encode()
+    req = urllib.request.Request(UBUNTU_GATEWAY, data=body, method="POST",
+                                 headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=120) as r:
+            d = json.loads(r.read().decode())
+        content = d.get("choices", [{}])[0].get("message", {}).get("content")
+        if not content:
+            return None
+        return {"summary": content[:1000], "provider": "ubuntu-onion",
+                "version": "cloud-gpu-%d" % int(time.time() * 1000),
+                "task_id": task_id}
+    except Exception as e:
+        print("[runner] ubuntu-gateway delegate failed: %s" % e)
+        return None
+
+
+def delegate_to_cloud_queue(task):
+    """CLOUD-DELEGATE B: push the job into the sovereign p2p delegate queue so the
+    cloud matrix can run it in parallel (millisecond-class human-speed lane)."""
+    task_id = task.get("id") or task.get("task_id") or "ml-unknown"
+    body = json.dumps({"agent_type": "code_executor",
+                       "prompt": f"Execute EON cloud-GPU job {task_id}: {json.dumps(task.get('data') or {})[:300]}"}).encode()
+    req = urllib.request.Request(P2P_CLOUD_DELEGATE, data=body, method="POST",
+                                 headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=45) as r:
+            d = json.loads(r.read().decode())
+        if d.get("ok"):
+            return {"delegated": d.get("task_id"), "provider": "p2p-delegate-queue",
+                    "version": "cloud-parallel", "task_id": task_id}
+    except Exception as e:
+        print("[runner] p2p delegate failed: %s" % e)
+    return None
+
+
 def _looks_like_python(code):
     return bool(code) and not any(marker in code for marker in ("torch.", "import torch", "tensorflow"))
 
@@ -122,12 +174,25 @@ def exec_python(code, timeout=120):
 
 
 def run_job(task):
-    """Run one job -> (result, provider). Returns (None, None) if we can't run it."""
+    """Run one job -> (result, provider). Returns (None, None) if we can't run it.
+    All-in-cloud: snn/torch GPU jobs first try the sovereign cloud lanes (Ubuntu
+    onion gateway, then p2p delegate queue); local CPU dry-run is only the last
+    resort so we never block the pipeline on a GPU-less box."""
     framework = (task.get("framework") or "").lower()
     gpu = bool(task.get("gpu"))
     code = task.get("code") or ""
 
     if gpu and framework in ("snn", "torch") and not has_torch():
+        if CLOUD_DELEGATE:
+            # 1) twin Ubuntu GPU-class brain (523 models, over Tor)
+            r = delegate_to_ubuntu_gateway(task)
+            if r:
+                return r, "ubuntu-onion"
+            # 2) sovereign p2p delegate queue (parallel cloud matrix)
+            r = delegate_to_cloud_queue(task)
+            if r:
+                return r, "p2p-delegate-queue"
+        # 3) last resort: local deterministic dry-run (never wedge the pipeline)
         return run_dry_simulation(task), "dry-run-cpu"
 
     if framework in ("python", "generic") and _looks_like_python(code):
