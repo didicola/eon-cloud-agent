@@ -33,6 +33,22 @@ LOOP_S = float(os.environ.get("EON_RUNNER_LOOP_SEC", "15"))
 WEIGHTS_LEN = 64
 
 
+def _load_token():
+    token = os.environ.get("EON_ACCESS_TOKEN", "")
+    if token:
+        return token
+    for p in ("state/.mesh-token.env", "/root/eon-cloud-agent/state/.mesh-token.env"):
+        try:
+            with open(p) as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith("EON_ACCESS_TOKEN="):
+                        return line.split("=", 1)[1]
+        except OSError:
+            continue
+    return ""
+
+
 def _headers(token=None):
     h = {"Content-Type": "application/json"}
     if token:
@@ -170,7 +186,7 @@ def run_cycle(mesh, token, simulate=None):
 def _main(argv=None):
     p = argparse.ArgumentParser(prog="cloud_gpu_runner", description=__doc__)
     p.add_argument("--mesh", default=DEFAULT_MESH)
-    p.add_argument("--token", default=os.environ.get("EON_ACCESS_TOKEN"))
+    p.add_argument("--token", default=_load_token())
     p.add_argument("--once", action="store_true", help="single pull+complete cycle, then exit")
     p.add_argument("--simulate", metavar="TASK_ID", help="dry-sim a task id and complete it (debug)")
     a = p.parse_args(argv)

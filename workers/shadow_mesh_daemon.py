@@ -23,11 +23,35 @@ NODE_ID = "node5"
 HEARTBEAT_INTERVAL = 60
 
 
+def _load_token():
+    token = os.environ.get("EON_ACCESS_TOKEN", "")
+    if token:
+        return token
+    for p in ("state/.mesh-token.env", "/root/eon-cloud-agent/state/.mesh-token.env"):
+        try:
+            with open(p) as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith("EON_ACCESS_TOKEN="):
+                        return line.split("=", 1)[1]
+        except OSError:
+            continue
+    return ""
+
+
+def _headers():
+    h = {"Content-Type": "application/json"}
+    token = _load_token()
+    if token:
+        h["Authorization"] = "Bearer " + token
+    return h
+
+
 def _post(path, obj):
     req = urllib.request.Request(
         f"{MESH}{path}",
         data=json.dumps(obj).encode(),
-        headers={"Content-Type": "application/json"},
+        headers=_headers(),
         method="POST",
     )
     with urllib.request.urlopen(req, timeout=10) as r:
@@ -35,7 +59,8 @@ def _post(path, obj):
 
 
 def _get(path):
-    with urllib.request.urlopen(f"{MESH}{path}", timeout=10) as r:
+    req = urllib.request.Request(f"{MESH}{path}", headers=_headers())
+    with urllib.request.urlopen(req, timeout=10) as r:
         return json.loads(r.read().decode() or "{}")
 
 

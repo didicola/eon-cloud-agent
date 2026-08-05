@@ -45,9 +45,11 @@ def log(msg):
 def call(method, path, data=None, timeout=30):
     url = MESH + path
     body = json.dumps(data).encode() if data is not None else None
-    req = urllib.request.Request(url, data=body, method=method,
-                                 headers={"Content-Type": "application/json",
-                                          "User-Agent": "eon-learn/"})
+    headers = {"Content-Type": "application/json", "User-Agent": "eon-learn/"}
+    token = os.environ.get("EON_ACCESS_TOKEN", "")
+    if token:
+        headers["Authorization"] = "Bearer " + token
+    req = urllib.request.Request(url, data=body, method=method, headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return json.loads(r.read().decode())
@@ -56,8 +58,12 @@ def call(method, path, data=None, timeout=30):
 
 
 def get(path, timeout=15):
+    headers = {}
+    token = os.environ.get("EON_ACCESS_TOKEN", "")
+    if token:
+        headers["Authorization"] = "Bearer " + token
     try:
-        with urllib.request.urlopen(MESH + path, timeout=timeout) as r:
+        with urllib.request.urlopen(urllib.request.Request(MESH + path, headers=headers), timeout=timeout) as r:
             return json.loads(r.read().decode())
     except Exception as e:
         return {"error": str(e)}

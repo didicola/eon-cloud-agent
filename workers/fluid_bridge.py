@@ -23,9 +23,17 @@ REASON_WORDS = ("reason", "logic", "math", "proof", "solve", "code", "explain",
                 "compare", "why", "how does", "plan")
 
 
+def _headers():
+    h = {"Content-Type": "application/json"}
+    token = os.environ.get("EON_ACCESS_TOKEN", "")
+    if token:
+        h["Authorization"] = "Bearer " + token
+    return h
+
+
 def _post(path, data, timeout=90):
     req = urllib.request.Request(MESH + path, data=json.dumps(data).encode(),
-                                 headers={"Content-Type": "application/json"}, method="POST")
+                                 headers=_headers(), method="POST")
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return json.loads(r.read().decode())
@@ -34,8 +42,12 @@ def _post(path, data, timeout=90):
 
 
 def _get(path, timeout=20):
+    headers = {}
+    token = os.environ.get("EON_ACCESS_TOKEN", "")
+    if token:
+        headers["Authorization"] = "Bearer " + token
     try:
-        with urllib.request.urlopen(MESH + path, timeout=timeout) as r:
+        with urllib.request.urlopen(urllib.request.Request(MESH + path, headers=headers), timeout=timeout) as r:
             return json.loads(r.read().decode())
     except Exception as e:
         return {"error": str(e)}

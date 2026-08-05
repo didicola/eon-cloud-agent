@@ -45,6 +45,14 @@ MESH = os.environ.get("EON_MESH", "http://127.0.0.1:8787")
 INTERVAL = int(os.environ.get("EON_ROUND_INTERVAL", "300"))   # 5 min
 FLAP_LIMIT = int(os.environ.get("EON_ROUND_FLAP", "6"))       # max repairs per cycle
 
+
+def _headers():
+    h = {"Content-Type": "application/json"}
+    token = os.environ.get("EON_ACCESS_TOKEN", "")
+    if token:
+        h["Authorization"] = "Bearer " + token
+    return h
+
 # (name, probe_url_or_cmd) — self-fix health matrix. repair = boot_stack (idempotent).
 HEALTH_MATRIX = [
     ("mesh-host",    "http://127.0.0.1:8787/api/health"),
@@ -81,7 +89,7 @@ def _probe(name):
         try:
             body = json.dumps({"prompt": "__liveness__"}).encode()
             req = urllib.request.Request(MESH + "/api/fluid", data=body,
-                                         headers={"Content-Type": "application/json"},
+                                         headers=_headers(),
                                          method="POST")
             with urllib.request.urlopen(req, timeout=12) as r:
                 return True, "fluid via /api/fluid"
@@ -185,7 +193,7 @@ def self_fix_round():
 def _kv_put(key, value):
     body = json.dumps({"key": key, "value": json.dumps(value)}).encode()
     req = urllib.request.Request(MESH + "/store/" + key, data=body,
-                                 headers={"Content-Type": "application/json"}, method="PUT")
+                                 headers=_headers(), method="PUT")
     with urllib.request.urlopen(req, timeout=10) as r:
         return r.status
 

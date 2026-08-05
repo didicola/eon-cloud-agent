@@ -33,10 +33,13 @@ signal.signal(signal.SIGINT, sig)
 def call(method, path, data=None, timeout=15):
     url = MESH + path
     body = json.dumps(data).encode() if data is not None else None
-    req = urllib.request.Request(url, data=body, method=method,
-                                 headers={"Content-Type": "application/json",
-                                          "X-Node-Id": NODE_ID,
-                                          "User-Agent": f"eon-agent/{NODE_ID}"})
+    headers = {"Content-Type": "application/json",
+               "X-Node-Id": NODE_ID,
+               "User-Agent": f"eon-agent/{NODE_ID}"}
+    token = os.environ.get("EON_ACCESS_TOKEN", "")
+    if token:
+        headers["Authorization"] = "Bearer " + token
+    req = urllib.request.Request(url, data=body, method=method, headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return json.loads(r.read().decode())

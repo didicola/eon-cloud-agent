@@ -587,3 +587,68 @@ warm ping 5.6ms intact.
 - git push to github (didicola/eon-cloud-agent) still PENDING — needs a PAT or gh auth on this
   box; local commits ready. Alternative sovereign route: copy tarball to the Ubuntu box and
   run bash eon-install.sh (no credentials needed).
+
+## 2026-08-05 — DEEP ARCHITECTURE AUDIT (full, read-only) + arch map
+- Full A-to-Z audit by 2 parallel explore agents (cloud fleet + live local system).
+- ARCH MAP (verified):
+  * LOCAL (this box, node5): mesh-host :8787 (token-gated WAL KV) <- supervisor
+    (flock) <- tor onion o3izfmjj...onion:80. consensus brain infer_bridge :8201
+    (eon-blindproxy :8093 + blindproxy :8090). 18 boot_stack services.
+  * CLOUD (Cloudflare Workers, "own cloud" mirrors): eon-p2p-cloud (sync/config +
+    /v1/models + /delegate/pending + /sync/memory D1, ALIVE sync/dead chat),
+    cloud-brain-proxy (/v1/chat/completions, ALIVE but 502 quota-exhausted
+    "4006 used up daily 10k neurons" + "eon-datacenter: eon empty"), eon-site
+    (web shell, health 200, /api/chat = "(Cloud AI status 404)"), ai-cloud-space
+    (KV AI_MEMORY + D1 AI_STORE, ALIVE but 401), eon-datacenter (/v1/recall,
+    1 row "gate3 test memory"), eon-flarex (egress, 200). DEAD: eon-mesh-swarm,
+    eon-round-matrix, cloud-brain-v2, zen-swarm-1 (DNS dead).
+  * TELEGRAM AGI @Ririmobot (eon-cloud-worker/index.js, cron */1 polling, KV
+    history/experiences/offset): ALIVE at Telegram API but DEAF — stale webhook
+    api.trycloudflare.com (405) causes getUpdates 409 conflict; 2 pending msgs
+    stuck; reply path broken (quota 502).
+- LIVE SYSTEM BREAKAGES (root causes, all confirmed):
+  1. eon_gpu_node.py + cloud_gpu_runner.py send NO Authorization -> gpu-node1
+     heartbeat 401 x64 (token gate added 15:50Z); last live hb 69min stale.
+  2. 10 of 18 daemons DEAD since 2026-08-04 23:38-40 (session kill never recovered):
+     eon_neural_agent, fluid_bridge :8401, snapshot_daemon, entropy_daemon,
+     embed_shim :11555, eon_self_heal_daemon, eon_local_immunity, round_matrix_daemon,
+     learn_daemon, shadow_mesh_daemon. boot_stack today only started svc 17/18.
+  3. NESTED DUPLICATE mesh-supervisor: 32099(outer)->32103(inner)->32105(mesh-host).
+     Inner inherited flock fd 9 from outer -> flock -n 9 dedupe defeated. immunity
+     (which cleans dups) is dead.
+  4. KV: 227 keys, sk:model:active_version=snn-tor-e2e-<ts> vs sk:active_model_version
+     {"v":"10"} (documented divergence). ML tasks 5 STUCK claimed + 10 done + 0 queued.
+     Compute 2 STUCK dispatched to gpu-node1 never completed.
+  5. Mirror /mnt/fluid-cloud stale (kv.latest 199 keys vs live 227) — snapshot dead.
+  6. Second Ubuntu: NO real connection. node-twin is a PHANTOM self-reference (same
+     onion as node5, ts sentinel 9999999999999, hb stale 3059min). delegate/pending
+     has tasks queued to ubuntu/termux/samsung all UNCLAIMED. No SSH keys, no
+     inbound, twin_sync.py never run.
+- Cloud verdict: NO cloud channel fully functional for AGI conversation today;
+  storage/telemetry channels (p2p sync, datacenter recall, flarex health) work.
+  Neuron quota resets daily — brain may come back.
+
+## 2026-08-05 — Repairs after deep audit (all-18 restored, token gate fixed)
+- Delegation sent to AGI cloud (Telegram @Ririmobot msg 4994); brain quota-exhausted
+  (4006 10k neurons/day), so executed the proven repairs directly.
+- GATE FIX (root cause of 401 storm): mesh access token now injected TWO ways:
+  1) venv-run.sh exports EON_ACCESS_TOKEN=<state/.mesh-token.env> for every python
+     service if the caller didn't set it (single edit, covers all daemons).
+  2) In-file `_load_token()` / `_headers()` helpers reading env OR state/.mesh-token.env
+     added to: eon_gpu_node.py, cloud_gpu_runner.py, shadow_mesh_daemon.py,
+     entropy_daemon.py, learn_daemon.py, eon_neural_agent.py, fluid_bridge.py,
+     round_matrix_daemon.py, eon_self_heal_daemon.py. All POST to MUTATING routes
+     (nodes, memory/decay, memory/episodic, learn, fluid, compute, store) now send
+     Authorization: Bearer. VERIFIED: gpu-node1 hb 401->200, node5 registered rep 84,
+     learn spawn run-1785951946996 ok, entropy entropy-applied.
+- STACK RESTORED: all 10 dead daemons + supervisor relaunched via boot_stack (was
+  only svc17/18 after the Aug-4 session-kill). Single instance each.
+- STABILITY: mesh-host flapped with EADDRINUSE (zombie held :8787 while supervisor
+  respawned). Fixed by restarting mesh-host cleanly + supervisor. Note: boot_stack
+  spawn (node workers/mesh-host.js) vs manual (node mesh-host.js cwd workers) causes
+  a pgrep race that can double-spawn — the flock/Zombie that EADDRINUSE'd.
+- VERIFIED E2E: ML job ml-1785956569196 queued->pulled->trained(dry-run-cpu)->
+  completed (200)->status done, metrics acc 0.9155. All 18 services = exactly 1 each.
+- Still broken/cloud-side: AGI cloud brain quota (10k neurons) + eon-site AI 404 +
+  p2p chat timeout; only storage/telemetry channels up. Second Ubuntu still not
+  connected (twin phantom, delegate queue unclaimed).

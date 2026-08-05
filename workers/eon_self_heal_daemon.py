@@ -174,8 +174,12 @@ def memorize(text):
     try:
         body = json.dumps({"text": text, "tag": "self-heal",
                            "emotional_weight": 1, "outcome": "success"}).encode()
+        headers = {"Content-Type": "application/json"}
+        token = os.environ.get("EON_ACCESS_TOKEN", "")
+        if token:
+            headers["Authorization"] = "Bearer " + token
         req = urllib.request.Request(MESH + "/api/memory/episodic", data=body,
-                                     headers={"Content-Type": "application/json"}, method="POST")
+                                     headers=headers, method="POST")
         with urllib.request.urlopen(req, timeout=10):
             pass
     except Exception:

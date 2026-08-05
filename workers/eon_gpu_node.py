@@ -24,9 +24,25 @@ NODE_ID = "gpu-node1"
 HEARTBEAT_S = float(os.environ.get("EON_GPU_HEARTBEAT_SEC", "60"))
 
 
+def _load_token():
+    token = os.environ.get("EON_ACCESS_TOKEN", "")
+    if token:
+        return token
+    for p in ("state/.mesh-token.env", "/root/eon-cloud-agent/state/.mesh-token.env"):
+        try:
+            with open(p) as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith("EON_ACCESS_TOKEN="):
+                        return line.split("=", 1)[1]
+        except OSError:
+            continue
+    return ""
+
+
 def _headers():
     h = {"Content-Type": "application/json"}
-    token = os.environ.get("EON_ACCESS_TOKEN", "")
+    token = _load_token()
     if token:
         h["Authorization"] = "Bearer " + token
     return h

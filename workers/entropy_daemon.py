@@ -18,6 +18,14 @@ import urllib.request
 MESH = os.environ.get("EON_MESH", "http://127.0.0.1:8787")
 INTERVAL = int(os.environ.get("EON_ENTROPY_INTERVAL", "900"))  # 15 min
 MAX_AGE_DAYS = int(os.environ.get("EON_ENTROPY_MAX_AGE_DAYS", "30"))
+
+
+def _headers():
+    h = {"Content-Type": "application/json"}
+    token = os.environ.get("EON_ACCESS_TOKEN", "")
+    if token:
+        h["Authorization"] = "Bearer " + token
+    return h
 THRESHOLD = int(os.environ.get("EON_ENTROPY_THRESHOLD", "1"))  # forget weight < 1 if too old
 DECAY = float(os.environ.get("EON_ENTROPY_DECAY", "0.05"))
 
@@ -25,7 +33,7 @@ DECAY = float(os.environ.get("EON_ENTROPY_DECAY", "0.05"))
 def decay_pass():
     body = json.dumps({"max_age_days": MAX_AGE_DAYS, "threshold": THRESHOLD, "decay": DECAY})
     req = urllib.request.Request(MESH + "/api/memory/decay", data=body.encode(),
-                                 headers={"Content-Type": "application/json"}, method="POST")
+                                 headers=_headers(), method="POST")
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
             return json.loads(r.read().decode())
