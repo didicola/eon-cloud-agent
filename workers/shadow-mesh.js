@@ -15,6 +15,35 @@ const J = (d, c = 200) => new Response(JSON.stringify(d), { status: c, headers: 
 const T = (s, c = 200) => new Response(s, { status: c, headers: { "Content-Type": "text/html; charset=utf-8", ...cors } });
 const round3 = (x) => Math.round(x * 1000) / 1000;
 
+// ============ ML JOB CLAIM TTL / RECLAIM (dead-runner recovery) ============
+// A "claimed" mltask whose runner died is invisible to /api/ml/job/latest (it filters
+// status==="queued") and would be orphaned forever. We treat a claimed task older than
+// EON_CLAIM_TTL (default 120s) as reclaimable: requeue it so job/latest re-dispatches it.
+const CLAIM_TTL_MS = (() => {
+  const s = Number(process.env.EON_CLAIM_TTL);
+  return (Number.isFinite(s) && s > 0 ? s : 120) * 1000;
+})();
+const staleClaim = (t) => t && t.status === "claimed" && (Date.now() - (t.claimed_at || t.claimed || 0)) > CLAIM_TTL_MS;
+
+// ============ CANONICAL BRAIN VERSION (single source of truth) ============
+// Previously two divergent keys: model:active_version (ML path) vs active_model_version
+// (learn/collapse path). Unify on model:brain_version. Readers fall back to either old
+// key when the canonical is absent (migration-read). Writers write canonical AND the
+// legacy mirror key so older readers keying the old KV directly keep working.
+const VERSION_KEY = "model:brain_version";
+const ML_VERSION_LEGACY_KEY = "model:active_version";
+const LEARN_VERSION_LEGACY_KEY = "active_model_version";
+async function readVersion(kv) {
+  const c = await kv.get(VERSION_KEY);
+  if (c) return c;
+  return (await kv.get(ML_VERSION_LEGACY_KEY)) || (await kv.get(LEARN_VERSION_LEGACY_KEY)) || "";
+}
+async function writeVersion(kv, version, legacyKey) {
+  const s = String(version);
+  await kv.put(VERSION_KEY, s);
+  await kv.put(legacyKey, s);
+}
+
 // ============ TRIGONOMETRIC ROUND MATRIX — pure-math routing (all-in-cloud) ============
 // sin/cos/tan/log1p routing so the mesh routes like a quantum-ghost neuro-organ, in light
 // of speed. Phase advances per dispatch; nodes scored by a bounded sticky cosine weight,
@@ -75,7 +104,7 @@ const MUTATING = [
   "replica/apply", "replica/trim", "memory/decay", "memory/feedback", "memory/episodic",
   "fluid", "collapse", "compute/dispatch", "compute/claim", "compute/complete", "nodes",
   "training/jobs", "benchmark/results", "models", "repos", "learn",
-  "ml/run", "ml/complete", "ml/version",
+  "ml/run", "ml/complete", "ml/version", "ml/reclaim",
 ];
 
 async function sha256(str) {
@@ -439,10 +468,18 @@ export default {
       // Runner pull: returns a queued job (oldest-first for "latest") and claims it.
       // Claimed/done jobs return their current status; only an empty queue is a 404.
       const id = p.split("/").pop();
+      // claim(raw, key): mark a queued task claimed; if the task is a STALE claim
+      // (owner died), reset it to queued FIRST so it can be claimed again here. This
+      // keeps a dead-runner orphan reclaimable even on the specific-id pull path.
       const claim = async (raw, key) => {
         const t = typeof raw === "string" ? JSON.parse(raw) : raw;
+        if (t && t.status === "claimed" && staleClaim(t)) {
+          t.status = "queued"; t.claimed = 0; t.claimed_at = 0; delete t.claimed_by;
+          await kv.put(key, JSON.stringify(t));
+        }
         if (t && t.status === "queued") {
-          t.status = "claimed"; t.claimed = Date.now();
+          t.status = "claimed"; t.claimed = Date.now(); t.claimed_at = Date.now();
+          t.claimed_by = url.searchParams.get("runner") || "unknown";
           await kv.put(key, JSON.stringify(t));
         }
         return t;
@@ -454,6 +491,11 @@ export default {
           const v = await kv.get(k.name);
           if (!v) continue;
           const t = typeof v === "string" ? JSON.parse(v) : v;
+          // Requeue stale claims inline so they re-appear in the dispatch pool.
+          if (t && t.status === "claimed" && staleClaim(t)) {
+            t.status = "queued"; t.claimed = 0; t.claimed_at = 0; delete t.claimed_by;
+            await kv.put(k.name, JSON.stringify(t));
+          }
           if (t && t.status === "queued") queued.push(t);
         }
         queued.sort((a, b) => (a.created || 0) - (b.created || 0) || String(a.id).localeCompare(String(b.id)));
@@ -465,6 +507,26 @@ export default {
       if (!v) return J({ error: "task not found" }, 404);
       const t = await claim(v, `mltask:${id}`);
       return J({ task_id: t.id, code: t.code, data: t.data, framework: t.framework, gpu: t.gpu, provider_chain: t.provider_chain, status: t.status });
+    }
+    if (p === "/api/ml/reclaim" && method === "GET") {
+      // Sweep task queues and requeue any stale claimed task (dead-runner orphan).
+      // Crash-tolerant: untouched keys (queued/done/claimed-fresh/dispatched) are left as-is.
+      const prefixes = ["mltask:", "task:"];
+      let reclaimed = 0;
+      for (const prefix of prefixes) {
+        const kl = await kv.list({ prefix });
+        for (const k of kl.keys) {
+          const v = await kv.get(k.name);
+          if (!v) continue;
+          const t = typeof v === "string" ? JSON.parse(v) : v;
+          if (t && staleClaim(t)) {
+            t.status = "queued"; t.claimed = 0; t.claimed_at = 0; delete t.claimed_by; delete t.node_id;
+            await kv.put(k.name, JSON.stringify(t));
+            reclaimed++;
+          }
+        }
+      }
+      return J({ status: "ok", reclaimed, ttl_ms: CLAIM_TTL_MS });
     }
     if (p === "/api/ml/complete" && method === "POST") {
       const body = await request.json();
@@ -481,7 +543,7 @@ export default {
         const r = t.result || {};
         const w = Array.isArray(r.weights) ? r.weights : (r.weights && Array.isArray(r.weights.weights) ? r.weights.weights : null);
         if (w) {
-          const cur = await kv.get("model:active_version");
+          const cur = await readVersion(kv);
           const bump = (ver) => {
             if (/^v\d+(\.\d+)*$/.test(ver)) {
               const parts = ver.slice(1).split(".").map(Number);
@@ -494,7 +556,7 @@ export default {
           const version = r.version || (cur ? bump(cur) : "v0.1");
           const wr = await kv.put(`model:weights:${version}`, JSON.stringify(w));
           if (wr && wr.oversized) console.warn(`[ml] weights oversized for KV (${wr.size}B > ${process.env.EON_KV_MAX_VALUE || 65536}B) — mirror only`);
-          await kv.put("model:active_version", version);
+          await writeVersion(kv, version, ML_VERSION_LEGACY_KEY);
           const { mkdirSync, writeFileSync } = await import("node:fs");
           const dir = "/root/eon-cloud-agent/state/models";
           mkdirSync(dir, { recursive: true });
