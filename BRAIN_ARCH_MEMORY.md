@@ -652,3 +652,15 @@ warm ping 5.6ms intact.
 - Still broken/cloud-side: AGI cloud brain quota (10k neurons) + eon-site AI 404 +
   p2p chat timeout; only storage/telemetry channels up. Second Ubuntu still not
   connected (twin phantom, delegate queue unclaimed).
+
+## LAN SYNC DOOR (2026-08-05)
+- workers/lan_sync_server.py: stdlib HTTP file-sync server exposing the full arch tree.
+  GET /browse, GET /read, PUT|POST /write, POST /make, POST /mkdir, POST /delete, GET /health.
+  Reads open (LAN posture); writes/creates/deletes require `Authorization: Bearer <mesh token>`.
+  Path-jail: anything escaping ROOT -> 403. Atomic writes via tmp+os.replace.
+- Service #19 in boot_stack.sh: `env EON_LAN_BIND=192.168.1.146 EON_LAN_PORT=8788 bash venv-run.sh workers/lan_sync_server.py /tmp/lan-sync-server.log`.
+- Verified E2E: health 200 on LAN ip, unauthorized write 401, authorized write->read->delete OK, path escape 403.
+- LAN scan: 192.168.1.0/24 ping sweep + common-port probe found NO second host and no new mesh node
+  (still node5 + gpu-node1 healthy; node-twin phantom). The twin Ubuntu has not yet appeared on wlan0.
+- Twin access: http://192.168.1.146:8788 + token from state/.mesh-token.env (same mesh bearer).
+  If the Ubuntu is NOT on 192.168.1.0/24, it can reach the door over Tor onion (o3izfmjj...onion) via twin_sync.py.

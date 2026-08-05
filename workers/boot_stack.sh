@@ -100,6 +100,11 @@ start "venv/bin/python -u workers/cloud_gpu_runne[r].py" /tmp/cloud-gpu-runner.l
 #     so GPU-aware /api/compute/dispatch has a live target (fixes the phantom gpu-node1).
 start "venv/bin/python -u workers/eon_gpu_no[de].py" /tmp/eon-gpu-node.log -- bash venv-run.sh "$W/eon_gpu_node.py" /tmp/eon-gpu-node.log
 
+# 19. lan_sync_server — LAN file-sync door for the twin Ubuntu: browse/read the full
+#     arch tree, token-gated write/make/mkdir/delete. Binds the LAN IP only (wlan0),
+#     stdlib-only, so the second Ubuntu can inspect + modify the arch directly.
+start "venv/bin/python -u workers/lan_sync_serve[r].py" /tmp/lan-sync-server.log -- env EON_LAN_BIND=192.168.1.146 EON_LAN_PORT=8788 bash venv-run.sh "$W/lan_sync_server.py" /tmp/lan-sync-server.log
+
 log "boot complete — verifying health"
 sleep 3
 curl -s -m 3 http://127.0.0.1:8787/api/health | head -c 60; echo
