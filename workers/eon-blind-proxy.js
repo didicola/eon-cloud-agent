@@ -7,7 +7,8 @@
 //   1. cloud-brain-proxy  (sovereign-cloud, bearer token)
 //   2. eon-site /api/chat  (AI Web)
 //   3. cloud-native unified-router  (workers-ai/deepinfra/siliconflow — sovereign)
-//   4. local-brain          (zero upstream tokens)
+//   4. ubuntu-onion        (twin Ubuntu model gateway, :8094 sidecar -> Tor onion)
+//   5. local-brain          (zero upstream tokens)
 //
 // Run:  node eon-blind-proxy.js    (listens :8092 by default, ENV EON_BP_PORT)
 
@@ -23,6 +24,7 @@ const P2P_MODELS = ['deepseek-r1', 'gpt-oss-120b', 'gpt-oss-20b', 'llama-3.3-70b
 const EON_SITE = process.env.EON_SITE_URL || 'https://eon-site.exportdefaultasyncfetchrequestenvconsturl.workers.dev/api/chat';
 const EON_SITE_TOKEN = process.env.EON_SITE_TOKEN || '48e6a9a31a84f5b28d832a2e14dcf470a2ae15b20fbc0bd606e583991385b349';
 const CLOUD_NATIVE = process.env.EON_CLOUD_NATIVE_MODEL || 'qwen-coder-32b';
+const UBUNTU_GATEWAY = process.env.EON_UBUNTU_GATEWAY_URL || 'http://127.0.0.1:8094/v1/chat/completions';
 
 const UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
 
@@ -176,7 +178,7 @@ async function matrixBrainOrder() {
       ...(d.ai_clouds || []), ...(d.web_clouds || []),
       ...(d.exit_clouds || []), ...(d.store_clouds || [])
     ].filter(c => c.up).map(c => c.id);
-    const order = ['eon-p2p-cloud', 'cloud-brain-proxy', 'eon-site', 'cloud-native'];
+    const order = ['eon-p2p-cloud', 'cloud-brain-proxy', 'eon-site', 'cloud-native', 'ubuntu-onion'];
     // sort healthy clouds to the front, keep stable order for ties
     const ranked = order.filter(n => healthy.includes(n)).concat(order.filter(n => !healthy.includes(n)));
     brainCache = { at: Date.now(), order: ranked };
@@ -270,7 +272,24 @@ async function viaCloudNative(payload) {
   } catch (e) { return null; }
 }
 
-// ─── Provider 4: local brain (zero upstream) ───
+// ─── Provider 4: ubuntu-onion (twin Ubuntu model gateway) ───
+// Routes over the local ubuntu_gateway sidecar (:8094), which dials the twin
+// Ubuntu box's hidden model door over Tor SOCKS5. 523 models, live inference.
+async function viaUbuntuOnion(payload) {
+  const msgs = JSON.parse(JSON.stringify(payload.messages || []));
+  const res = await fetchUpstream(UBUNTU_GATEWAY,
+    { model: payload.model || 'auto', messages: msgs, max_tokens: payload.max_tokens || 4096, stream: false, temperature: payload.temperature ?? 0.7 },
+    {}, 90000);
+  if (res.status !== 200) return null;
+  try {
+    const d = JSON.parse(res.body);
+    const content = d.choices?.[0]?.message?.content || null;
+    if (!content) return null;
+    return { content, model: d.model || 'ubuntu-onion', via: 'ubuntu-onion' };
+  } catch (e) { return null; }
+}
+
+// ─── Provider 5: local brain (zero upstream) ───
 async function viaLocalBrain(messages) {
   const last = lastUser(messages);
   const t = (last || '').trim().toLowerCase();
@@ -311,7 +330,8 @@ async function routeChat(payload, res) {
     { name: 'eon-p2p-cloud', fn: () => viaP2PCloud(payload) },
     { name: 'cloud-brain-proxy', fn: () => viaCloudBrain(payload) },
     { name: 'eon-site', fn: () => viaEonSite(payload) },
-    { name: 'cloud-native', fn: () => viaCloudNative(payload) }
+    { name: 'cloud-native', fn: () => viaCloudNative(payload) },
+    { name: 'ubuntu-onion', fn: () => viaUbuntuOnion(payload) }
   ];
 
   // MATRIX-BRAIN: consult the neural matrix registry — deprioritize/skip clouds
@@ -423,7 +443,7 @@ const server = http.createServer((req, res) => {
 
   if (req.method === 'GET' && u.pathname === '/v1/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(JSON.stringify({ status: 'ok', provider: 'EON blind-proxy', models: UNIQUE.length, upstream: ['eon-p2p-cloud', 'cloud-brain-proxy', 'eon-site', 'cloud-native', 'local-brain'], rotation: 'parallel-race (speed-of-light)' }));
+    return res.end(JSON.stringify({ status: 'ok', provider: 'EON blind-proxy', models: UNIQUE.length, upstream: ['eon-p2p-cloud', 'cloud-brain-proxy', 'eon-site', 'cloud-native', 'ubuntu-onion', 'local-brain'], rotation: 'parallel-race (speed-of-light)' }));
   }
 
   if (req.method === 'GET' && u.pathname === '/v1/matrix') {
@@ -436,6 +456,7 @@ const server = http.createServer((req, res) => {
         { name: 'cloud-brain-proxy', model: 'sovereign-cloud', location: 'Cloudflare edge', strength: 'sovereign brain' },
         { name: 'eon-site', model: 'AI Web', location: 'Cloudflare edge', strength: 'web intelligence' },
         { name: 'cloud-native', model: 'qwen-coder-32b', location: 'cloud unified-router', strength: 'sovereign workers-ai/deepinfra fallback' },
+        { name: 'ubuntu-onion', model: '523-model gateway', location: 'twin Ubuntu over Tor', strength: 'live inference via ubuntu_gateway sidecar (:8094)' },
         { name: 'local-brain', model: 'local', location: 'Termux', strength: 'zero upstream tokens' }
       ],
       models: UNIQUE.length
@@ -477,5 +498,5 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, '127.0.0.1', () => {
-  console.error('[eon-blind-proxy] :' + PORT + ' — ' + UNIQUE.length + ' models, upstream: cloud-brain-proxy → eon-site → cloud-native → local');
+  console.error('[eon-blind-proxy] :' + PORT + ' — ' + UNIQUE.length + ' models, upstream: cloud-brain-proxy → eon-site → cloud-native → ubuntu-onion → local');
 });

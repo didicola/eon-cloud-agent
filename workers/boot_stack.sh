@@ -105,6 +105,11 @@ start "venv/bin/python -u workers/eon_gpu_no[de].py" /tmp/eon-gpu-node.log -- ba
 #     stdlib-only, so the second Ubuntu can inspect + modify the arch directly.
 start "venv/bin/python -u workers/lan_sync_serve[r].py" /tmp/lan-sync-server.log -- env EON_LAN_BIND=192.168.1.146 EON_LAN_PORT=8788 bash venv-run.sh "$W/lan_sync_server.py" /tmp/lan-sync-server.log
 
+# 20. ubuntu_gateway — twin Ubuntu onion model gateway sidecar (:8094). Exposes the
+#     Ubuntu box's 523-model hidden door as a LOCAL OpenAI-compatible endpoint over
+#     Tor SOCKS5, consumed by eon-blind-proxy as provider 5 (ubuntu-onion).
+start "venv/bin/python -u workers/ubuntu_gatewa[y].py" /tmp/ubuntu-gateway.log -- bash venv-run.sh "$W/ubuntu_gateway.py" /tmp/ubuntu-gateway.log
+
 log "boot complete — verifying health"
 sleep 3
 curl -s -m 3 http://127.0.0.1:8787/api/health | head -c 60; echo

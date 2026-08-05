@@ -664,3 +664,23 @@ warm ping 5.6ms intact.
   (still node5 + gpu-node1 healthy; node-twin phantom). The twin Ubuntu has not yet appeared on wlan0.
 - Twin access: http://192.168.1.146:8788 + token from state/.mesh-token.env (same mesh bearer).
   If the Ubuntu is NOT on 192.168.1.0/24, it can reach the door over Tor onion (o3izfmjj...onion) via twin_sync.py.
+
+## TWO-WAY ONION MAP + UBUNTU MODEL GATEWAY (2026-08-05)
+- Bidirectional sovereign mesh now confirmed live:
+  - Termux box  -> o3izfmjjt2pmsgauio7fau3ykiwm5ion4ltojv7zegdpp7n74tfqsqad.onion (mesh door: KV, nodes, tasks)
+  - Ubuntu box  -> 6ww3yh3rfmufriunf2jodikn3meh3mjfd7s7binezhwkiunsnmed34ad.onion (model door: 523 models, live inference)
+- Verified the Ubuntu onion directly: GET /v1/models -> 200 (523 models), POST /v1/chat/completions -> live inference
+  (routed via Meta-Llama-3.3-70B-Instruct, inclusionai/ling-3.0-flash-free). It is a PURE model gateway
+  (mesh/sync/delegate/memory paths all 404) — the Ubuntu box's hidden model door.
+- workers/ubuntu_gateway.py (service #20, :8094): local OpenAI-compatible sidecar that dials the Ubuntu
+  onion over Tor SOCKS5 (127.0.0.1:9050) with a raw SOCKS handler (same pattern as twin_sync.py). Exposes
+  /health, /v1/models (523 cached 10min), /v1/chat/completions (forwards, 120s timeout, chunked-decode).
+- Wired as Provider 5 in workers/eon-blind-proxy.js (chain: eon-p2p-cloud -> cloud-brain-proxy -> eon-site
+  -> cloud-native -> ubuntu-onion -> local). Added viaUbuntuOnion(), registered in providers[], matrix order,
+  /v1/health upstream list, /v1/matrix nodes, startup banner. Verified :8093 health shows ubuntu-onion.
+- The 523-model gateway gives the Termux stack a second sovereign compute lane: any service can point at
+  http://127.0.0.1:8094/v1/chat/completions (or :8093 with the full chain).
+- Coordinator note: Ubuntu's eon-coordinator.sh counts PENDING delegate tasks (Ubuntu:0 = zero ubuntu-targeted
+  tasks, not a node-count). Onion check is $ONION/v1/models. Ubuntu coordinator still uses STALE onion
+  6ww3yh... (this is actually the Ubuntu box's own onion, correct for ITS model door — for the Termux mesh
+  door it must use o3izfmjj...). Dispatched ubuntu-targeted task local-task-1785967610788-xvnvgf -> claimed.
