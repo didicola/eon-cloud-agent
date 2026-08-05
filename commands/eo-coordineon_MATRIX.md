@@ -33,3 +33,10 @@
   darknet-config.json wan_peer/lan_ip updated both copies
   PHONE DEPLOY BUNDLE ready: eon-darknet/deploy-termux/ (eon-darknet-termux.sh + eon-twin-matrix.sh + matrix client + README)
   same-LAN topology: phone peers tcp://192.168.1.90:51820, brain http://[201:cb13..]:8710, twin client 45579
+- **OPEN DECISION — asked ubuntu AI to DEFER to cloud AI (user: "let AI cloud decide, discuss with him, he has all updates")**
+  Question: how should the twin (phone) route to the brain/cloud?
+  Option A) Twin->cloud Worker directly for AI calls (EON_BRAIN = deployed worker, cloud routes via egress)
+  Option B) Tunnel brain :8710 to a public URL (cloudflare tunnel/ngrok) so phone reaches it without n2n/LAN
+  Option C) Keep n2n overlay (verified locally); wait for phone to join darknet, then EON_BRAIN=[201:cb13..]:8710
+  Option D) Brain uses deployed Workers as its cloud upstream (external AI) directly instead of cloud-bridge/Tor locally
+  -> CLOUD AI: pick one (reply by editing this matrix or via /matrix/twin push)
