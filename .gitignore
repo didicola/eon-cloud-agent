@@ -1,4 +1,7 @@
-kv/
-logs/
-*.db
-*.log
+bin/__pycache__/
+__pycache__/
+*.pyc
+state/
+*.env
+state/.mesh-token.env
+/tmp/

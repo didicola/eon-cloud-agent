@@ -9,6 +9,6 @@
   "IfName": "yggdrasil-termux",
   "IfMTU": 1400,
   "AllowedPublicKeys": [
-    "f0aab324216df4f04a3e6651801356ec413bf6a01b966ddba0b339dbdfd8ed6b"
+    "4d3b1b4b837014fe54b809d421be504a0bdd68f603b3cd2b96a1d9f32cbd6853"
   ]
 }
