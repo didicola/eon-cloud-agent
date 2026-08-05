@@ -6,23 +6,26 @@ ARCHIVE = "/mnt/fluid-cloud/ai-archive/swarm7000"
 DB = os.path.expanduser("~/.eon/swarm7000.db")
 BLIND = "http://127.0.0.1:8090/v1/chat/completions"
 SOVEREIGN = "http://127.0.0.1:3003/v1/chat/completions"
+# eon-blind-proxy alias + a tested-reliable model on :8090 (523 models).
+EON_BLIND_URL = BLIND
+EON_BLIND_MODEL = "qwen/qwen3-coder:free"   # verified responsive (~5s) vs 'auto' slow chain
 DB_LOCK = threading.Lock()
 
 AGENT_TYPES = {
-    "planner": {"model": "gpt-4.1", "url": SOVEREIGN, "prompt": "Break this task into numbered steps. Output only steps."},
-    "coder": {"model": "gpt-4.1", "url": SOVEREIGN, "prompt": "Write production code. Output ONLY code with # filename header."},
+    "planner": {"model": EON_BLIND_MODEL, "url": EON_BLIND_URL, "prompt": "Break this task into numbered steps. Output only steps."},
+    "coder": {"model": EON_BLIND_MODEL, "url": EON_BLIND_URL, "prompt": "Write production code. Output ONLY code with # filename header."},
     "researcher": {"model": "auto", "url": BLIND, "prompt": "Research this topic. Give concise facts. Do not write code."},
-    "critic": {"model": "gpt-4.1", "url": SOVEREIGN, "prompt": "Review critically. Find bugs, edge cases, improvements."},
-    "builder": {"model": "gpt-4.1", "url": SOVEREIGN, "prompt": "Build a complete working solution. Output only the implementation."},
+    "critic": {"model": EON_BLIND_MODEL, "url": EON_BLIND_URL, "prompt": "Review critically. Find bugs, edge cases, improvements."},
+    "builder": {"model": EON_BLIND_MODEL, "url": EON_BLIND_URL, "prompt": "Build a complete working solution. Output only the implementation."},
     "memory": {"model": "auto", "url": BLIND, "prompt": "Summarize concisely. Keep key points only. Discard fluff."},
-    "orchestrator": {"model": "gpt-4.1", "url": SOVEREIGN, "prompt": "Coordinate multiple subtasks. Assign work to appropriate agents."},
+    "orchestrator": {"model": EON_BLIND_MODEL, "url": EON_BLIND_URL, "prompt": "Coordinate multiple subtasks. Assign work to appropriate agents."},
     "tester": {"model": "auto", "url": BLIND, "prompt": "Test this code. Find bugs, edge cases. Report PASS/FAIL for each case."},
     "writer": {"model": "auto", "url": BLIND, "prompt": "Write clear documentation. Explain what, why, and how."},
     "archiver": {"model": "auto", "url": BLIND, "prompt": "Organize and index information for long-term storage."},
-    "deployer": {"model": "gpt-4.1", "url": SOVEREIGN, "prompt": "Deploy applications. Write Dockerfiles, docker-compose, and shell scripts. Output only the deployment commands."},
-    "infra": {"model": "gpt-4.1", "url": SOVEREIGN, "prompt": "Manage infrastructure: systemd, Docker, Caddy, ports, networking. Output working shell commands."},
-    "docker": {"model": "gpt-4.1", "url": SOVEREIGN, "prompt": "Docker specialist. Write Dockerfiles, docker-compose.yml, and container configs. Output only working files."},
-    "caddy": {"model": "gpt-4.1", "url": SOVEREIGN, "prompt": "Caddy reverse proxy specialist. Write Caddyfile configs for virtual hosts, TLS, routing. Output only the Caddyfile."},
+    "deployer": {"model": EON_BLIND_MODEL, "url": EON_BLIND_URL, "prompt": "Deploy applications. Write Dockerfiles, docker-compose, and shell scripts. Output only the deployment commands."},
+    "infra": {"model": EON_BLIND_MODEL, "url": EON_BLIND_URL, "prompt": "Manage infrastructure: systemd, Docker, Caddy, ports, networking. Output working shell commands."},
+    "docker": {"model": EON_BLIND_MODEL, "url": EON_BLIND_URL, "prompt": "Docker specialist. Write Dockerfiles, docker-compose.yml, and container configs. Output only working files."},
+    "caddy": {"model": EON_BLIND_MODEL, "url": EON_BLIND_URL, "prompt": "Caddy reverse proxy specialist. Write Caddyfile configs for virtual hosts, TLS, routing. Output only the Caddyfile."},
     "gateway": {"model": "auto", "url": BLIND, "prompt": "Manage the Fluid Storage Gateway. Give rclone commands, mount operations, and storage management steps."},
 }
 
