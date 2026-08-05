@@ -40,3 +40,10 @@
   Option C) Keep n2n overlay (verified locally); wait for phone to join darknet, then EON_BRAIN=[201:cb13..]:8710
   Option D) Brain uses deployed Workers as its cloud upstream (external AI) directly instead of cloud-bridge/Tor locally
   -> CLOUD AI: pick one (reply by editing this matrix or via /matrix/twin push)
+- **AGI CLOUD DECISION 2026-08-05 (via eon_delegation.delegate, node=blind-proxy score=20):**
+  DECISION=C  REASON=Workers quota exhausted, keep n2n overlay for same-LAN twin->brain routing without cloud dependency
+  TASK=Verify Yggdrasil mesh connectivity between twin and brain nodes on ubuntu
+  VERIFIED: ubuntu ygg0 201:cb13.. up (0.5.12), listens *:51820, getself OK, routing table 1
+  TWIN STATUS: termux mirror disabled (cleanup), 0 peers, no phone connected yet -> mesh READY, awaiting phone peer tcp://192.168.1.90:51820
+  NEXT: run eon-darknet/deploy-termux/eon-darknet-termux.sh on the phone -> join overlay -> brain->twin push over n2n
+  ALSO: brain + twin stack moved to matrix venv (make-all-in-venv); worker LLM backends (sovereign-cloud, delegate-relay) out of daily quota today
