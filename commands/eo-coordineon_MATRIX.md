@@ -28,3 +28,8 @@
   admin sockets: ubuntu /var/run/yggdrasil, termux /var/run/yggdrasil-termux
   DARKNET_MODE routes internal twin traffic over Yggdrasil, no Tor, no earth
 - next tick in 60s (self-healing)
+- **NETWORK CHANGE 2026-08-05**: box LAN IPv4 changed 10.140.40.103/22 -> 192.168.1.90/24
+  termux-peer peers updated -> tcp://192.168.1.90:51820 (ubuntu ygg0 still listens *:51820)
+  darknet-config.json wan_peer/lan_ip updated both copies
+  PHONE DEPLOY BUNDLE ready: eon-darknet/deploy-termux/ (eon-darknet-termux.sh + eon-twin-matrix.sh + matrix client + README)
+  same-LAN topology: phone peers tcp://192.168.1.90:51820, brain http://[201:cb13..]:8710, twin client 45579
