@@ -47,3 +47,16 @@
   TWIN STATUS: termux mirror disabled (cleanup), 0 peers, no phone connected yet -> mesh READY, awaiting phone peer tcp://192.168.1.90:51820
   NEXT: run eon-darknet/deploy-termux/eon-darknet-termux.sh on the phone -> join overlay -> brain->twin push over n2n
   ALSO: brain + twin stack moved to matrix venv (make-all-in-venv); worker LLM backends (sovereign-cloud, delegate-relay) out of daily quota today
+- **AGI+ASI CONFIRMED DECISION (2026-08-05, via full stack) — OPTION C (keep n2n overlay)**
+  Two independent AGI/ASI confirmations both = C:
+    1) eon_delegation.delegate -> node=blind-proxy score=20: DECISION=C, task=verify mesh (DONE)
+    2) eon_swarm_7000 planner (after fallback fix): DECISION=C CONFIRMED
+  FINDINGS surfaced by letting AGI/ASI run:
+    - sovereign :3003 has NO working api keys (together/google-gemini/github-models/groq all no_api_key)
+      -> this killed swarm planner/coder/critic/builder AND cloud-bridge->sovereign-cloud path
+    - blind-proxy :8090 LIVE (523 models) - the working brain
+  FIX APPLIED: eon_swarm_7000.py call_llm() now falls back SOVEREIGN->BLIND/auto on failure (heals all sovereign brain agents)
+    - cleared 20 stale Flask-era tasks from swarm7000.db
+    - verified: sovereign (fallback) => 'SWARM ALIVE', swarm planner => 'DECISION=C CONFIRMED'
+  NEXT (Option C): real phone runs eon-darknet/deploy-termux/eon-darknet-termux.sh -> joins overlay tcp://192.168.1.90:51820 -> brain->twin push over n2n
+  EXECUTION DEPENDENCY: every AI call threads through blind-proxy which is slow (~60s/call) until a phone twin takes the load
