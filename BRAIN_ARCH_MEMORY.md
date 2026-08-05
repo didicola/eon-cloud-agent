@@ -560,3 +560,30 @@ warm ping 5.6ms intact.
   chat completions time out upstream) -> design from verified architecture instead of cloud.
 - Current stack: tor :9050 + onion; mesh-host :8787 token-gated + WAL; supervisor respawns
   both; consensus brain :8201; eon-blindproxy :8093; blindproxy :8090.
+
+## 2026-08-05 — Sovereign delivery to second Ubuntu box (git push chosen, no creds found)
+- Asked to "send the full arch to other local ubuntu". No SSH config/keys/hosts found on this
+  box (LAN :22 scan empty); github remote reachable but git push needs credentials (none stored).
+- Asked user for delivery method -> user chose "Git push + clone instructions".
+- Secret scrub BEFORE push: token value scrubbed from this file (was hardcoded, now redacted);
+  state/.mesh-token.env is untracked + state/ now in .gitignore (plus *.env, /tmp/). Verified
+  0 token refs in staged diff.
+- Commit 19f5316 "EON 5.0.0-COSMIC" = 67 files (cloud-GPU runner, WAL, convo memory, onion
+  door, colab notebook, boot_stack 18 svcs). Commit 0ae9ec2 = eon-install.sh + tor-min.conf.
+- User then said "let ASI/AGI cloud decide after full delegations" — but AGI cloud chat
+  completions STILL down (consensus brain up, all upstream LLM providers timeout). CF sync
+  remote alive (eon-p2p-cloud worker) but is a sync channel, not a decision engine. So the
+  decision was made from architecture: build a credential-free sovereign deploy bundle.
+- eon-install.sh: fresh-Ubuntu bootstrap. Copies package, GLOBALLY replaces /root/eon-cloud-agent
+  -> $INSTALL_DIR across all files (grep -rlFZ + while read -d '' — a plain newline read
+  silently rewrote 0 files; NUL output + NUL read is the working pattern), creates stdlib venv,
+  generates a FRESH per-install token into state/.mesh-token.env (0600), starts tor from
+  workers/tor-min.conf, runs boot_stack.sh, health-checks 8787+8201.
+- Verified in /tmp sandbox: 22 files rewritten, 0 /root refs left, venv-run + mesh-supervisor
+  + mesh-host.js all adapted.
+- Bundle: /tmp/eon-deploy-20260805.tar.gz (567K, sha256 11663db0...). Excludes .git, venv,
+  state, __pycache__, *.pyc, *.log, *.wal. Zero node deps (stdlib only) — target needs Node
+  18+, Python 3.11+, tor.
+- git push to github (didicola/eon-cloud-agent) still PENDING — needs a PAT or gh auth on this
+  box; local commits ready. Alternative sovereign route: copy tarball to the Ubuntu box and
+  run bash eon-install.sh (no credentials needed).
