@@ -1,0 +1,18 @@
+[Unit]
+Description=EON Sovereign Router — Custom model routing tier
+After=network.target blind-proxy.service
+Wants=blind-proxy.service
+
+[Service]
+Type=simple
+User=ricos
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /home/ricos/eon-cloud-agent/eon_sovereign_router.py
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
