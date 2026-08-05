@@ -6,7 +6,7 @@
 # ═══════════════════════════════════════════════════════════════
 set -euo pipefail
 
-EON_ROOT="/mnt/fluid-cloud/cloud-opencode"
+EON_ROOT="${EON_ROOT:-/mnt/fluid-cloud/cloud-opencode}"
 LOCAL_RUNTIME="http://127.0.0.1:8787"
 CF_API="https://api.cloudflare.com/client/v4"
 CF_ACCOUNT="8eacb8fd6130211d2e51f8dae2b03c75"

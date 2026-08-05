@@ -1,0 +1,122 @@
+name: EON Cloud ML Runner
+
+on:
+  workflow_dispatch:
+    inputs:
+      task_id:
+        description: "EON task id"
+        required: true
+        type: string
+      job_url:
+        description: "URL to the job JSON payload"
+        required: true
+        type: string
+      framework:
+        description: "torch or tf"
+        required: false
+        default: torch
+        type: string
+  repository_dispatch:
+    types: [eon-ml-run]
+
+jobs:
+  run-ml:
+    name: Run cloud ML job
+    runs-on: ubuntu-latest
+    env:
+      EON_GATEWAY_URL: ${{ secrets.EON_GATEWAY_URL }}
+      EON_FW_DISPATCH: ${{ github.event.inputs.framework }}
+      EON_FW_PAYLOAD: ${{ github.event.client_payload.framework }}
+      EON_TASK_DISPATCH: ${{ github.event.inputs.task_id }}
+      EON_TASK_PAYLOAD: ${{ github.event.client_payload.task_id }}
+      EON_JOB_URL_DISPATCH: ${{ github.event.inputs.job_url }}
+      EON_JOB_URL_PAYLOAD: ${{ github.event.client_payload.job_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install framework
+        shell: bash
+        run: |
+          FW="${EON_FW_DISPATCH:-${EON_FW_PAYLOAD:-torch}}"
+          if [ "$FW" = "tf" ]; then
+            pip install --quiet tensorflow
+          else
+            pip install --quiet torch
+          fi
+          python -c "import sys; print('python', sys.version.split()[0])"
+
+      - name: Run job and report to gateway
+        shell: bash
+        run: |
+          TASK_ID="${EON_TASK_DISPATCH:-${EON_TASK_PAYLOAD:-}}"
+          JOB_URL="${EON_JOB_URL_DISPATCH:-${EON_JOB_URL_PAYLOAD:-}}"
+          echo "task_id=${TASK_ID} job_url=${JOB_URL}"
+          python - <<'PY'
+          import contextlib
+          import io
+          import json
+          import os
+          import urllib.request
+
+          gw = (os.environ.get("EON_GATEWAY_URL") or "http://127.0.0.1:8787").rstrip("/")
+          job_url = (
+              os.environ.get("EON_JOB_URL_DISPATCH")
+              or os.environ.get("EON_JOB_URL_PAYLOAD")
+              or ""
+          )
+          if not job_url:
+              raise SystemExit("no job_url supplied")
+          with urllib.request.urlopen(job_url, timeout=180) as r:
+              job = json.loads(r.read().decode("utf-8"))
+          task_id = (
+              job.get("task_id")
+              or os.environ.get("EON_TASK_DISPATCH")
+              or os.environ.get("EON_TASK_PAYLOAD")
+              or "unknown"
+          )
+          buf = io.StringIO()
+          ok = True
+          error = None
+          try:
+              with contextlib.redirect_stdout(buf):
+                  exec(compile(job.get("code", ""), "<gh-job>", "exec"), {"data": job.get("data", {})})
+          except Exception as e:
+              ok = False
+              error = repr(e)
+          result = {"stdout": buf.getvalue(), "error": error}
+          payload = {
+              "task_id": task_id,
+              "status": "done" if ok else "failed",
+              "result": result,
+              "provider": "github-actions",
+          }
+          req = urllib.request.Request(
+              gw + "/api/ml/complete",
+              data=json.dumps(payload).encode("utf-8"),
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+          with urllib.request.urlopen(req, timeout=180) as r:
+              print("webhook:", r.read().decode("utf-8"))
+          PY
+
+      - name: Upload result via rclone (if configured)
+        shell: bash
+        run: |
+          if command -v rclone >/dev/null 2>&1; then
+            VERSION="${EON_VERSION_PAYLOAD:-latest}"
+            rclone copy result.json mirror:models/"$VERSION" 2>/dev/null || \
+              rclone copy result.json sovereign:models/"$VERSION" 2>/dev/null || true
+          fi
+
+      - name: Notify
+        if: always()
+        shell: bash
+        run: |
+          echo "EON ML job finished (task_id=${EON_TASK_DISPATCH:-${EON_TASK_PAYLOAD:-unknown}})"

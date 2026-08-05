@@ -1,24 +1,91 @@
 import { createServer } from 'node:http';
-import { readFileSync, writeFileSync, mkdirSync, renameSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, renameSync, appendFileSync, existsSync } from 'node:fs';
+
+// ── sovereign access token: env EON_ACCESS_TOKEN, else load from state/.mesh-token.env
+//    (single source for both boot_stack and mesh-supervisor launches) ──
+if (!process.env.EON_ACCESS_TOKEN) {
+  try {
+    const t = readFileSync('/root/eon-cloud-agent/state/.mesh-token.env', 'utf8');
+    const m = t.match(/EON_ACCESS_TOKEN=(\S+)/);
+    if (m) process.env.EON_ACCESS_TOKEN = m[1];
+  } catch {}
+}
 
 // ── disk-backed KV: sovereign persistent store (mem-map for reads, write-through journal) ──
 const STATE = '/root/eon-cloud-agent/state/kv.json';
+const WAL_FILE = '/root/eon-cloud-agent/state/kv.wal';
+const WAL_CHECKPOINT = Number(process.env.EON_WAL_CHECKPOINT || 50);
 mkdirSync('/root/eon-cloud-agent/state', { recursive: true });
-const DISK = (() => { try { return JSON.parse(readFileSync(STATE, 'utf8')); } catch { return {}; } })();
-const persist = () => { const tmp = STATE + '.tmp'; writeFileSync(tmp, JSON.stringify(DISK)); renameSync(tmp, STATE); };
+const DISK = (() => {
+  let d = {};
+  try { d = JSON.parse(readFileSync(STATE, 'utf8')); } catch {}
+  // ── WAL recovery: replay any acknowledged-but-not-yet-checkpointed writes in order ──
+  try {
+    if (existsSync(WAL_FILE)) {
+      const w = readFileSync(WAL_FILE, 'utf8');
+      let n = 0;
+      for (const line of w.split('\n')) {
+        if (!line.trim()) continue;
+        try {
+          const r = JSON.parse(line);
+          if (r.op === 'put') d[r.k] = r.v;
+          else if (r.op === 'del') delete d[r.k];
+          n++;
+        } catch {}
+      }
+      if (n > 0) {
+        console.log(`[wal] recovered ${n} ops`);
+        // snapshot immediately so recovered entries survive even if the next
+        // write never happens before a subsequent crash (WAL was truncated).
+        try { const tmp = STATE + '.tmp'; writeFileSync(tmp, JSON.stringify(d)); renameSync(tmp, STATE); } catch {}
+        try { writeFileSync(WAL_FILE, ''); } catch {}
+      }
+    }
+  } catch {}
+  return d;
+})();
+const walAppend = (op, k, v) => {
+  // write-through: sync append BEFORE persist enters the queue keeps WAL order == final state order
+  try { appendFileSync(WAL_FILE, JSON.stringify({ op, k, v, t: Date.now() }) + '\n'); } catch {}
+};
+let walOps = 0;
+const persist = () => {
+  const tmp = STATE + '.tmp';
+  writeFileSync(tmp, JSON.stringify(DISK));
+  renameSync(tmp, STATE);
+  // WAL checkpoint: the snapshot just captured everything acknowledged so far → truncate WAL
+  walOps++;
+  if (walOps >= WAL_CHECKPOINT) {
+    try { writeFileSync(WAL_FILE, ''); } catch {}
+    walOps = 0;
+  }
+};
 let writeQueue = Promise.resolve();
 const enqueuePersist = () => { writeQueue = writeQueue.then(() => new Promise(res => setTimeout(res, 5))).then(persist).catch(() => {}); };
+console.log(`[wal] journaling to ${WAL_FILE}`);
 
 const KV = class {
   constructor(prefix) { this.m = DISK; this.prefix = prefix; }
   async put(k, value, opts) {
+    // SOVEREIGN KV BLOAT GUARD: refuse to store a single value larger than MAX_VAL
+    // (the envelope-nesting bug drove task/train blobs to 407KB, killing replica sync).
+    const MAX_VAL = Number(process.env.EON_KV_MAX_VALUE || 65536);
+    let size;
+    try { size = Buffer.byteLength(JSON.stringify(value)); } catch { size = 0; }
+    if (size > MAX_VAL) {
+      const kind = String(k).split(':')[0];
+      console.error(`[kv] REFUSED oversized value ${kind}:${k.slice(0,40)} size=${size} > ${MAX_VAL}`);
+      return { oversized: true, key: k, size };
+    }
     const kv = JSON.stringify({ v: value, meta: opts?.metadata || null, exp: opts?.expirationTtl ? Date.now() + opts.expirationTtl * 1000 : null, ts: Date.now() });
     this.m[`${this.prefix}${k}`] = kv;
+    walAppend('put', `${this.prefix}${k}`, kv);
     enqueuePersist();
+    return { ok: true };
   }
   async get(k) { const r = this.m[`${this.prefix}${k}`]; if (!r) return null; const { v, exp } = JSON.parse(r); if (exp && exp < Date.now()) { delete this.m[`${this.prefix}${k}`]; enqueuePersist(); return null; } return v; }
-  async getWithMetadata(k) { const r = this.m[`${this.prefix}${k}`]; if (!r) return { value: null, metadata: null }; const { v, meta, exp } = JSON.parse(r); if (exp && exp < Date.now()) { delete this.m[`${this.prefix}${k}`]; enqueuePersist(); return { value: null, metadata: null }; } return { value: v, metadata: meta }; }
-  async delete(k) { delete this.m[`${this.prefix}${k}`]; enqueuePersist(); }
+  async getWithMetadata(k) { const r = this.m[`${this.prefix}${k}`]; if (!r) return { value: null, metadata: null }; const { v, meta, exp, ts } = JSON.parse(r); if (exp && exp < Date.now()) { delete this.m[`${this.prefix}${k}`]; enqueuePersist(); return { value: null, metadata: null }; } return { value: v, metadata: meta, ts: ts || 0 }; }
+  async delete(k) { delete this.m[`${this.prefix}${k}`]; walAppend('del', `${this.prefix}${k}`, null); enqueuePersist(); }
   async list({ prefix = '' } = {}) { const keys = []; for (const k of Object.keys(this.m)) { if (k.startsWith(`${this.prefix}${prefix}`)) keys.push({ name: k.slice(this.prefix.length) }); } return { keys }; }
 };
 
@@ -100,7 +167,7 @@ const server = createServer(async (req, res) => {
   }
 });
 
-server.listen(8787, '127.0.0.1', () => console.log('EON mesh host on :8787'));
+server.listen(8787, '127.0.0.1', () => console.log(`EON mesh host on :8787, wal:${WAL_FILE}`));
 
 process.on('uncaughtException', (e) => console.error('mesh-host uncaught:', e.message));
 process.on('unhandledRejection', (e) => console.error('mesh-host rejection:', e.message));

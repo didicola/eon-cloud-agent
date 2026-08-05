@@ -5,6 +5,28 @@
 
 ---
 
+## 0. GOLDEN RULE (supreme governing principle — non-negotiable)
+**"All in the cloud, no earthly."** Maximize the avoidance of earthly dependencies in every
+decision. Design goals that follow from this rule:
+
+- **Cloud-native always:** the Neural Web OS, its data (Repos/Models/Tasks/Nodes), and its
+  control live in OUR cloud, not on the local Terminal. The local Termux box is ONLY a thin
+  terminal/agent that polls tasks. It must not host dashboards or APIs as its primary role.
+- **Earthly constraints to minimize (in priority order):**
+  1. Cloudflare tokens/quotas/accounts (a single-account free tier = a leash; 429/1027 quota,
+     00:00 UTC reset, KV 1k writes/day) — treat as a *mirror*, never the source of truth.
+  2. Telegram / mail.tm / GitHub PAT / DNS registrars / domain squatting / netfrom-west
+     creditors — temporary crutches, not the core.
+- **What "own cloud" means concretely** (per user brief): own API, own DNS (`*.eon-mesh.internal`
+  + thousands of domains, normal and crypted/onion), own VPS, own data centers, own model
+  registry, own code host — a genuinely parallel internet, not Earthly's shadow.
+- **Sovereign fact we proved:** a Tor hidden service (onion) on a node we control is our own
+  cloud endpoint — creator-gated reachable through Tor, **no quota, no provider, no DNS, no VPS**.
+  This is the anchor of "all in cloud, no earthly."
+- Prev/ever-default: prefer the sovereign runtime (onion + disk-backed KV on our node) OVER a
+  Cloudflare `.workers.dev` URL whenever cloud free quota is a blocker; use CF only as an
+  optional faster mirror, never the decidion base.
+
 ## 1. Core Mission
 Build a **Parallel Internet OS** ("EON Neural Web") that provides own-alternatives to the
 Earthly internet, all hosted in the cloud, not on the local terminal:
@@ -150,14 +172,89 @@ Per ASI decision: keep the sovereign onion as PRIMARY data DC, zero-token/zero-q
 
 ## 8. Next-Steps To-Dos (pending)
 
-- [ ] Provide ≥1 CF token (or run deploy from wolf/twin) → execute matrix_rotate to cloud.
-- [ ] Re-wire `eon_neural_agent.py` toward the live `*.workers.dev` URL (local = terminal).
-- [ ] Repoint shadow_mesh dead pleasant popule → alive.
-- [ ] wire mesh_daemon toward local :8787 (done) / cloud.
-- [ ] Commit memory + matrix_rotate.
-- [ ] Decide by a committee of ASI + cloud on the strongest resilient deployment (rotating
-      accounts, D1-when-paid, DNS-matrix, P2P fallback).
+Per GOLDEN RULE (all-in-cloud, no-earthly): the sovereign path does NOT require a CF token.
+
+- [ ] **Sovereign-first (no token needed):** keep the onion + disk-backed KV on our node as the
+      PRIMARY data DC; make the local box purely a task-executing terminal.
+- [ ] Repair the "box role" — local agent should poll tasks and route inference via Matrix :8200,
+      never hold canonical data.
+- [x] **Earth-sovereign route test PASS:** onion reachable by a second node over Tor; twin
+      established as a SECOND node → an own-cloud with >1 node (no CF). See #twin-sync note.
+- [ ] Consider own stored data node on the twin (VM/data) for geo-redundancy, all via own channels.
+- [x] **Ghost Round Matrix** (workers/ghost_matrix.py): rotates past `503 request queue is full`
+      → next sovereign endpoint (Matrix:8200 → blind:8090 → own /api/models). Proven in sim.
+- [x] **Agent self-repair**: eon_neural_agent re-registers if heartbeat says unregistered (tested:
+      wiped node → auto re-registered).
+- [x] **Mesh replication**: /api/replica/snapshot|journal|apply (CRDT LWW over Tor) for 2nd node.
+- [x] **Persistence verified**: kv.json disk-backed survives restart (test-repo, eon-lif-1, benchmark).
+- [x] **Bio-AI + SNN + Fluid Brain**: snn_trainer.py (cloud-only, no local torch), snn-train.yml
+      (GH-Actions), benchmark_runner.py, /benchmark dashboard, fluid_bridge.py + /api/fluid.
+- [x] **Twin-sync over Tor PASS** (workers/twin_sync.py): `node-twin` dialed the onion over Tor
+      SOCKS (no earthly broker) → registered, heartbeat, pulled snapshot (15 keys), applied LWW
+      record. Both node5 + node-twin online; twin record persisted to disk kv.json.
+      → own-cloud is now >1 node, fully sovereign.
+- [x] **Twin compute PASS** (workers/twin_sync.py --compute): dispatched `sum` task rotated to
+      node-twin via round-robin; the twin claimed, executed (`{sum:3, node:'node-twin'}`) and
+      completed it over Tor. Task status=done, node=node-twin. Fixed chunked-transfer parsing in
+      `_tor_request` (node's HTTP server sends Transfer-Encoding: chunked — was returning raw).
+      → 2-node distributed own-cloud compute is live.
+- [x] **Geo-redundancy PASS** (workers/snapshot_daemon.py): 60s daemon mirrors kv.json to
+      /mnt/fluid-cloud/ (kv.latest.json + timestamped versions, keep 10) AND replays 22 records
+      to node-twin over Tor via /api/replica/apply. Verified: mirror integrity (24 keys, node5 +
+      node-twin present), twin canonical state present in snapshot. Unbuffered (-u) logging.
+- [x] **LEARNED: kv.json envelope** — each entry is stored as `{"v":<value>, "meta":..,"ts":..}`.
+      When replaying the KV to a twin/mirror, extract the inner `.v`, NEVER push the raw envelope
+      (causes double/triple-encoded strings in /api/nodes — nodes returned as `str` not dict).
+      Fix: re-register the node via POST /api/nodes to overwrite the corrupted record.
+- [x] **LEARNED: supervisor self-kill** — `pgrep -f "mesh-supervisor.sh"` matches the invoking
+      shell too; killing duplicates can kill the running supervisor AND the harness shell.
+      Use bracket pattern `mesh-superviso[r]`. Current roster (one each): tor, mesh-host,
+      mesh-supervisor, eon_neural_agent, fluid_bridge, snapshot_daemon.
+- [x] **LEARNED: agent crash on malformed tasks** — a corrupted queued task (double-encoded str)
+      crashed `eon_neural_agent` with `TypeError: string indices`. HARDENED: claim loop now skips
+      non-dict/missing-id tasks and keeps cycling. Corrupt `node5:task:*` records purged from KV.
+      Session interrupts kill ALL setsid daemons together — restart as a single batch command.
+- [x] **LEARNED: boot script** — `workers/boot_stack.sh` restores all six services idempotently
+      (starts only missing ones, bracket-pattern pgrep, logs timestamps). Recovery = one command:
+      `bash workers/boot_stack.sh`.
+- [ ] IF a CF token is later supplied for speed: run `matrix_deployer.py` to mirror to KV/D1, but
+      keep our onion as source of truth per golden rule.
+- [ ] Commit memory + golden rule.
+
+## 9. Session log — 3-Point Stub Repair (2026-08-04) → 100% fluid execution PASS
+Delegated to AI cloud (3 code_agents + critic). Fixed the 3 honest stubs surfaced by the A-to-Z
+audit and created a PERMANENT sovereign embedding round-matrix inside the cloud. Golden rule held
+(embedding vectorizer is LOCAL hashing-TF, no torch, no earthly model).
+- [x] **ghost_matrix async sleep bug** — `GhostMatrix.call()` blocked the asyncio loop with
+      `time.sleep`. Fixed → `await asyncio.sleep(delay)` (import asyncio). Async call() no longer
+      blocks; sync `run_round()` (used by eon_neural_agent) intentionally unchanged.
+- [x] **supervisor boot race** — multiple `mesh-supervisor.sh` could run. Fixed → single-instance
+      `flock` lock at head: `exec 9>/tmp/mesh-supervisor.lock; flock -n 9 || exit 0`. Exactly 1
+      supervisor; prevents duplicate mesh-host spawns.
+- [x] **hardcoded agent embedding** — `eon_neural_agent.execute("embed")` returned fake
+      `[len/1000,0.5,0.9]`. Fixed → POSTs text to embed shim, returns the REAL parsed vector
+      (`dim`, `embedding`); if shim down returns explicit `embed_degraded` (never fake data).
+- [x] **embed_shim.py (SERVICE #8, :11555)** — permanent sovereign embedding round-matrix:
+      deterministic 1024-dim hashing-TF vectors (L2-norm; cosine-meaningful: same-text cos 1.0,
+      diff-text cos 0.38; deterministic). Optional `EON_EMBED_REAL` upstream hook for a real
+      sovereign model when available; local fallback keeps it always-on. Added to boot_stack.sh.
+- [x] **Verified live:** V1 await present · V2 flock present · V3 shim len=1024 · exact 1 each of
+      8 services · mesh :8787 health ok · CRDT/tor untouched. Status: PASS.
 
 ---
 
 End of memory. Update this file proactively as the project evolves.
+## 10. Session log — Autonomic Nervous System + Digital Immune System (2026-08-04) PASS
+- [x] **eon_self_heal_daemon.py (svc #9, 60s)**: sync kv.json->fluid-cloud mirror; 4 health checks
+      (async bug / embed shim 1024 / dup daemons / mesh); auto-repair; /var/log/eon_self_heal.log.
+- [x] **eon_local_immunity.py (svc #10, 15s)**: dup-kill (keep newest), Tor SOCKS :9050 restart,
+      stale /tmp/eon-matrix-*.port sanitizer, py_compile code-integrity w/ sovereign-mirror restore.
+- [x] **round_matrix_daemon.py (svc #11, 300s)**: rotate all docs -> mirror, twin-pull guard,
+      health matrix -> health:round:latest KV card.
+- [x] **boot_stack pgrep guard BUG** (workers/ prefix mismatch caused dups on every boot): fixed all
+      guards to $W/<name>; verified 2 boots = 1 each of 10 services.
+- [x] **start_immune.sh** install script (flock single-instance).
+- [x] **CRITIC**: killed embed_shim -> self-heal auto-restarted it (dim 1024 back); immunity removed
+      a real stale port file. All live.
+
+---
