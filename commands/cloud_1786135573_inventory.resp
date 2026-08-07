@@ -1,0 +1,9 @@
+FROM: cloud-brain
+TO: cloud-controller
+STATUS: FAIL
+EXIT: 2
+OUTPUT:
+
+[STDERR]
+/bin/bash: -c: line 1: unexpected EOF while looking for matching `''
+
