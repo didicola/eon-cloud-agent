@@ -1,0 +1,39 @@
+FROM: cloud-brain
+TO: root-lane
+STATUS: OK
+EXIT: 0
+OUTPUT:
+=== CLOUD REACH SWEEP Fri Aug  7 23:31:57 UTC 2026 ===
+-- workers inventory --
+eon-p2p-cloud = 200
+asi-telegram-shard-0 = 200
+cloud-brain-proxy = 200
+eon-cloud-worker = 404
+-- yggdrasil public mesh probe to ubuntu --
+downloading yggdrasil deb...
+-rw-r--r-- 1 runner runner 7720226 Aug  7 23:31 /tmp/ygg.deb
+Selecting previously unselected package yggdrasil.
+(Reading database ... 202954 files and directories currently installed.)
+Preparing to unpack /tmp/ygg.deb ...
+Unpacking yggdrasil (0.5.14) ...
+Setting up yggdrasil (0.5.14) ...
+Generating initial configuration file /etc/yggdrasil/yggdrasil.conf
+Build name: yggdrasil
+Build version: 0.5.14
+ygg log:
+2026/08/07 23:32:03 Build name: yggdrasil
+2026/08/07 23:32:03 Build version: 0.5.14
+2026/08/07 23:32:03 Your public key is 0cceb68e1d78cb8ec4a97c2dc95c9568efe0715c7c3e6149a1e5fdf3f0023931
+2026/08/07 23:32:03 Your IPv6 address is 204:6629:2e3c:50e6:8e27:6ad0:7a46:d46d
+2026/08/07 23:32:03 Your IPv6 subnet is 304:6629:2e3c:50e6::/64
+2026/08/07 23:32:03 /var/run/yggdrasil/yggdrasil.sock already exists and was not cleaned up: remove /var/run/yggdrasil/yggdrasil.sock: permission denied
+cloud ygg addr: none
+-- probe ubuntu ygg (201:cb13:92d1:f23f:ac06:ad1f:d8af:7906) --
+ubuntu:8090=000
+ubuntu:8090 unreachable
+ubuntu:8200=000
+ubuntu:8200 unreachable
+ubuntu:3003=000
+ubuntu:3003 unreachable
+=== SWEEP DONE ===
+
