@@ -23,4 +23,5 @@ jobs:
       - name: Execute Eon Cloud Brain
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python3 cloud_tg.py
