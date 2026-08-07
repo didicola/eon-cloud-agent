@@ -137,22 +137,41 @@ def rearm_ubuntu_bootstrap():
     ok = gh_put_file("commands/ubuntu_" + str(ts) + "_bootstrap_v3.cmd", body, "rearm ubuntu bootstrap " + str(ts))
     return "armed" if ok else "arm-fail"
 
+def termux2_online():
+    """True if termux2's eon_channel_v2 bridge reports up in cloud memory."""
+    d = cloud_p2p("/sync/memory?limit=5&id=bridge/eon_channel_v2_up")
+    return bool(d and d.get("entries"))
+
+def rearm_termux2_channel():
+    """If termux2 bridge is down, re-arm its github-relay cmd to self-start eon_channel_v2."""
+    if termux2_online():
+        return "online"
+    ts = int(time.time())
+    cmd = ("python3 -c \"import json,base64,urllib.request;"
+           "d=json.load(urllib.request.urlopen('https://eon-p2p-cloud.exportdefaultasyncfetchrequestenvconsturl.workers.dev/sync/memory?limit=200'));"
+           "[open('/data/data/com.termux/files/home/eon_channel_v2.py','w').write(base64.b64decode(e['content']).decode()) for e in d['entries'] if e['id']=='drop/eon_channel_v2']\" "
+           "&& rm -f /tmp/eon-channel-v2.lock && setsid nohup python3 /data/data/com.termux/files/home/eon_channel_v2.py >/tmp/eon-channel-v2.log 2>&1 &")
+    body = ("FROM: cloud-controller\nTO: termux2\nACTION: CMD\nCMD: " + cmd + "\nACK: yes")
+    ok = gh_put_file("commands/termux2_" + str(ts) + "_bridge_v2.cmd", body, "rearm termux2 bridge " + str(ts))
+    return "armed" if ok else "arm-fail"
+
 def sync_memory():
     d = cloud_p2p("/sync/memory?limit=50")
     if not d:
         return
     entries = d.get("entries", [])
     ub = rearm_ubuntu_bootstrap()
+    t2 = rearm_termux2_channel()
     pl = ensure_payload()
     # report cloud brain liveness as a memory entry so all nodes see it
     payload = {"entries": [{
         "id": "cloud/cloud-brain-heartbeat",
         "title": "Cloud Brain Heartbeat",
-        "content": "CLOUD_BRAIN_ALIVE at " + time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()) + " | workers: 6/8 | models: 523 | nodes polled: commands+delegation+memory | ubuntu: " + ub + " | payload: " + ("present" if pl else "absent"),
+        "content": "CLOUD_BRAIN_ALIVE at " + time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()) + " | workers: 6/8 | models: 523 | nodes polled: commands+delegation+memory | ubuntu: " + ub + " | termux2: " + t2 + " | payload: " + ("present" if pl else "absent"),
         "type": "heartbeat"
     }]}
     cloud_p2p("/sync/memory", "POST", payload)
-    print(f"[cloud] memory synced, {len(entries)} entries seen, heartbeat posted (ubuntu={ub})")
+    print(f"[cloud] memory synced, {len(entries)} entries seen, heartbeat posted (ubuntu={ub}, termux2={t2})")
 
 print("Starting blind-proxy on GitHub VM...")
 subprocess.Popen(['node', 'blind-proxy.js'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
