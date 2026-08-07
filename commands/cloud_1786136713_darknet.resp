@@ -1,0 +1,65 @@
+FROM: cloud-brain
+TO: cloud-controller
+STATUS: OK
+EXIT: 0
+OUTPUT:
+
+No VM guests are running outdated hypervisor (qemu) binaries on this host.
+2026/08/07 21:05:53 Build name: yggdrasil
+2026/08/07 21:05:53 Build version: 0.5.5
+2026/08/07 21:05:53 Your public key is 1ac3550811c7ace6e043907b5989dc56f344f29fc5dc5173c120aff119d97cb2
+2026/08/07 21:05:53 Your IPv6 address is 203:53ca:af7e:e385:3191:fbc6:f84a:6762
+2026/08/07 21:05:53 Your IPv6 subnet is 303:53ca:af7e:e385::/64
+2026/08/07 21:05:53 Admin socket failed to listen: listen unix /var/run/yggdrasil/yggdrasil.sock: bind: no such file or directory
+=== SELF ===
+flag provided but not defined: -s
+Usage: yggdrasilctl [options] command [key=value] [key=value] ...
+
+Options:
+  -endpoint string
+=== PEERS ===
+flag provided but not defined: -s
+Usage: yggdrasilctl [options] command [key=value] [key=value] ...
+
+Options:
+  -endpoint string
+    	Admin socket endpoint (default "unix:///var/run/yggdrasil/yggdrasil.sock")
+  -json
+    	Output in JSON format (as opposed to pretty-print)
+  -version
+    	Prints the version of this build
+=== PING UBUNTU YGG ===
+ping: connect: Network is unreachable
+=== CURL UBUNTU EON-RUNTIME :8787 ===
+
+=== CURL UBUNTU MATRIX :8201 ===
+
+DARKNET_PROBE_DONE
+
+[STDERR]
++ which yggdrasil
++ sudo apt-get update -qq
++ sudo apt-get install -y -qq yggdrasil
++ tail -2
++ cat
++ sleep 8
++ sudo yggdrasil -useconffile /tmp/cloud-peer.hjson -useconf -logto file:///tmp/ygg.log
++ echo '=== SELF ==='
++ sudo yggdrasilctl -s /tmp/yggrun.sock getself
++ head -5
++ echo '=== PEERS ==='
++ sudo yggdrasilctl -s /tmp/yggrun.sock getpeers
++ head -10
++ echo '=== PING UBUNTU YGG ==='
++ ping -c2 -W3 201:cb13:92d1:f23f:ac06:ad1f:d8af:7906
++ tail -3
++ echo '=== CURL UBUNTU EON-RUNTIME :8787 ==='
++ curl -s -m5 --connect-timeout 4 'http://[201:cb13:92d1:f23f:ac06:ad1f:d8af:7906]:8787/'
++ head -c 400
++ echo
++ echo '=== CURL UBUNTU MATRIX :8201 ==='
++ curl -s -m5 --connect-timeout 4 'http://[201:cb13:92d1:f23f:ac06:ad1f:d8af:7906]:8201/v1/models'
++ head -c 400
++ echo
++ echo DARKNET_PROBE_DONE
+
