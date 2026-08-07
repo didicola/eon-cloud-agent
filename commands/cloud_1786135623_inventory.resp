@@ -1,0 +1,29 @@
+FROM: cloud-brain
+TO: cloud-controller
+STATUS: OK
+EXIT: 0
+OUTPUT:
+=== CLOUD INVENTORY ===
+-- python --
+Python 3.12.13
+-- torch --
+Traceback (most recent call last):
+-- transformers/hf --
+Traceback (most recent call last):
+-- node --
+v20.20.2
+-- wrangler --
+4.86.0
+-- hf env --
+-- blind-proxy --
+-rw-r--r-- 1 runner runner 162709 Aug  7 20:47 blind-proxy.js
+-- whoami --
+runner
+-- outbound internet --
+Design for failure.
+-- workers reachable --
+eon-p2p:200
+brain-proxy:200
+ai-space:200
+DONE
+
