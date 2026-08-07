@@ -167,7 +167,7 @@ def sync_memory():
     payload = {"entries": [{
         "id": "cloud/cloud-brain-heartbeat",
         "title": "Cloud Brain Heartbeat",
-        "content": "CLOUD_BRAIN_ALIVE at " + time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()) + " | workers: 6/8 | models: 523 | nodes polled: commands+delegation+memory | ubuntu: " + ub + " | termux2: " + t2 + " | payload: " + ("present" if pl else "absent"),
+        "content": "CLOUD_BRAIN_ALIVE at " + time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()) + " | workers: 6/8 | models: 523 | nodes polled: commands+delegation+memory | ubuntu: " + ub + " | termux2: " + t2 + " | failover: " + ("delegating" if (termux2_online() and any(e.get("id") == "bridge/termux2_delegate_consumer_up" for e in entries)) else "standby") + " | payload: " + ("present" if pl else "absent"),
         "type": "heartbeat"
     }]}
     cloud_p2p("/sync/memory", "POST", payload)
