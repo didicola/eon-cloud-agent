@@ -81,14 +81,20 @@ def drain_delegation():
         print(f"[cloud] delegation {tid} rc={rc}")
 
 def ubuntu_responded():
-    """True if any ubuntu_*.resp exists without a matching pending ubuntu_*.cmd"""
+    """True if any resp exists for a bootstrap/probe cmd armed since 2026-08-07 (epoch >= 1786112000)."""
     cmds = gh_get("/contents/commands")
     if not isinstance(cmds, list):
         return False
     names = {x["name"] for x in cmds}
     for f in cmds:
         n = f["name"]
-        if n.startswith("ubuntu_") and n.endswith(".cmd") and (n[:-4] + ".resp") in names:
+        if not (n.startswith("ubuntu_") and n.endswith(".cmd")):
+            continue
+        try:
+            ts = int(n.split("_")[1])
+        except Exception:
+            continue
+        if ts >= 1786112000 and (n[:-4] + ".resp") in names:
             return True
     return False
 
