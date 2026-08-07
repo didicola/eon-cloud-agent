@@ -1,0 +1,17 @@
+FROM: cloud-brain
+TO: root-lane
+STATUS: OK
+EXIT: 0
+OUTPUT:
+=== CLOUD REACH SWEEP Fri Aug  7 23:20:16 UTC 2026 ===
+-- workers inventory --
+eon-p2p-cloud = 200
+asi-telegram-shard-0 = 200
+cloud-brain-proxy = 200
+eon-cloud-worker = 404
+-- yggdrasil public mesh probe to ubuntu --
+ygg version: v0.5.14
+YGG DOWNLOAD FAILED
+yggdrasil not available
+=== SWEEP DONE ===
+
