@@ -142,7 +142,9 @@ def main():
                     step = getattr(self, "_step", 0)
                     self._step = step + 1
                     # oscillating sin threshold applied per simulation step
-                    self.threshold = neuron.threshold(step)
+                    # (threshold is a registered torch buffer in current snntorch)
+                    self.threshold = torch.tensor(neuron.threshold(step),
+                                                  dtype=mem.dtype, device=mem.device)
                     return super().forward(x, mem)
 
             # Canonical snntorch pattern: explicit mem state (init_hidden=True),
