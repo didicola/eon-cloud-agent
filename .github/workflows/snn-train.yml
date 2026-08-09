@@ -10,14 +10,19 @@ on:
         description: "SNN epochs (cloud, cap 5)"
         required: false
         default: "2"
+      stdp:
+        description: "Apply STDP plasticity pass after training (1=yes, 0=no)"
+        required: false
+        default: "1"
       mesh_url:
         description: "Sovereign worker URL (default localhost for host-run)"
         required: false
         default: "http://127.0.0.1:8787"
   repository_dispatch:
     types: [snn-train]
-  schedule:
-    - cron: "23 3 * * *"  # EON-Dream: SNN Cerebellum trains every 24h (~03:23 UTC) alongside the worker's 0 3 * * * dream cron
+  # NO 24h batch cron: EON-Dream now learns continuously in real-time.
+  # Micro-training runs are dispatched by eon_realtime_learner.py (Speed-of-Light
+  # Continuous Learning) the moment experiences land on the EON-Synapse bus.
 
 jobs:
   snn-train:
@@ -50,9 +55,10 @@ jobs:
         env:
           JOB_ID: ${{ github.event.inputs.job_id || 'tr-cloud-001' }}
           EPOCHS: ${{ github.event.inputs.epochs || '2' }}
+          STDP: ${{ github.event.inputs.stdp || '1' }}
           MESH_URL: ${{ github.event.inputs.mesh_url || 'http://127.0.0.1:8787' }}
         run: |
-          python3 workers/snn_cloud_trainer.py --epochs "$EPOCHS" --force-cloud --out /tmp/snn_cloud.json
+          python3 workers/snn_cloud_trainer.py --epochs "$EPOCHS" --force-cloud --out /tmp/snn_cloud.json $( [ "$STDP" = "1" ] && echo --stdp )
           echo "snn_metrics=$(cat /tmp/snn_cloud.json | python3 -c 'import sys,json;print(json.dumps(json.load(sys.stdin)))')" >> "$GITHUB_OUTPUT"
 
       - name: Upload SNN metrics to Neural Web Worker
