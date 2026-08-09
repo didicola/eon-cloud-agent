@@ -9,7 +9,12 @@ const CHAT_ID = '6663994526';
 const CLOUD_BRAIN_URL = 'https://cloud-brain-proxy.exportdefaultasyncfetchrequestenvconsturl.workers.dev/v1/chat/completions';
 const CLOUD_BRAIN_TOKEN = 'Pi6LNVeqGU_G4YEAxNHyXhczNqRjsmBuzTNt343PQtI';
 const EON_P2P_URL = 'https://eon-p2p-cloud.exportdefaultasyncfetchrequestenvconsturl.workers.dev/v1/chat/completions';
-const VERSION = '9.0-cloud-permanent';
+const VERSION = '10.0-sovereign-autogenesis';
+
+// Sovereign Auto-Genesis & Fluid Immune System — the Brain monitors itself.
+import { heartbeatTick, handleApi, json } from './heartbeat.js';
+// Pure Dark Matter — serverless Cloud IDE organ (KV + D1, zero earthly deps).
+import { handleIde } from './cloud_ide.js';
 
 // ═══════════════════════════════════════════════════════════════════════
 // DREAM CONFIG — loaded from KV or inline
@@ -354,6 +359,218 @@ async function pollUpdates(kv) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+// EON-REMOTE ORGAN — Sovereign Global Access
+// Thin cloud relay: earthly fetches happen HERE from the Cloudflare edge,
+// so earthly servers see only Cloudflare's IP and can never trace back
+// to the EON origin. Cache + mirror bodies in KV when the binding exists,
+// in-memory Map otherwise. No hardcoded hosts: /api/remote/discover
+// self-reports whatever origin the caller used.
+// ═══════════════════════════════════════════════════════════════════════
+
+const REMOTE_VERSION = '1.0.0';
+const REMOTE_BODY_TRUNCATE = 20000;      // bytes of body returned by /api/remote/fetch
+const REMOTE_CACHE_CAP = 100000;         // bytes stored per cached fetch (KV-safe)
+const REMOTE_MIRROR_CAP = 1000000;       // bytes stored per mirrored snapshot (KV-safe)
+const REMOTE_INDEX_CAP = 500;            // max mirror records kept in the index
+
+// In-memory fallback stores (used when env.EON_KV is not bound, or on KV failure)
+const REMOTE_MEM_CACHE = new Map();      // url-hash -> {url,status,body,contentType,fetched_at}
+const REMOTE_MEM_MIRRORS = new Map();    // ref -> {ref,url,fetched_at,size,status,contentType,body}
+const REMOTE_MEM_INDEX = [];             // mirror records (metadata only in list)
+
+// Stable djb2 hash -> KV-key-safe string (no long-URL key issues)
+function remoteHash(str) {
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36);
+}
+
+function remoteTruncate(s, max) {
+  if (!s) return '';
+  return s.length > max ? s.slice(0, max) + '…[truncated]' : s;
+}
+
+// ── store abstraction: KV when bound, memory otherwise (both always kept warm) ──
+function remoteMemGet(key) {
+  if (key.startsWith('remote:cache:')) return REMOTE_MEM_CACHE.get(key.slice(13)) || null;
+  if (key === 'remote:mirror:index') return REMOTE_MEM_INDEX.length ? [...REMOTE_MEM_INDEX] : null;
+  if (key.startsWith('remote:mirror:')) return REMOTE_MEM_MIRRORS.get(key.slice(14)) || null;
+  return null;
+}
+function remoteMemSet(key, val) {
+  if (key.startsWith('remote:cache:')) REMOTE_MEM_CACHE.set(key.slice(13), val);
+  else if (key === 'remote:mirror:index') { REMOTE_MEM_INDEX.length = 0; REMOTE_MEM_INDEX.push(...val); }
+  else if (key.startsWith('remote:mirror:')) REMOTE_MEM_MIRRORS.set(key.slice(14), val);
+}
+async function remoteKvGet(kv, key) {
+  if (!kv) return remoteMemGet(key);
+  try {
+    const v = (await kv.get(key, 'json')) ?? null;
+    return v !== null ? v : remoteMemGet(key);
+  } catch {
+    return remoteMemGet(key);
+  }
+}
+async function remoteKvPut(kv, key, val) {
+  if (!kv) { remoteMemSet(key, val); return; }
+  try {
+    await kv.put(key, JSON.stringify(val));
+  } catch (e) {
+    console.log('EON-Remote: KV write failed, memory fallback — ' + (e && e.message ? e.message : e));
+    remoteMemSet(key, val);
+  }
+}
+
+async function remoteCacheGet(kv, hash) { return remoteKvGet(kv, 'remote:cache:' + hash); }
+async function remoteCachePut(kv, hash, entry) { await remoteKvPut(kv, 'remote:cache:' + hash, entry); }
+async function remoteMirrorGet(kv, ref) { return remoteKvGet(kv, 'remote:mirror:' + ref); }
+async function remoteMirrorPut(kv, record) {
+  await remoteKvPut(kv, 'remote:mirror:' + record.ref, record);
+  const records = (await remoteKvGet(kv, 'remote:mirror:index')) || [];
+  const i = records.findIndex(r => r.ref === record.ref);
+  if (i >= 0) records[i] = record; else records.push(record);
+  await remoteKvPut(kv, 'remote:mirror:index', records);
+}
+
+// SSRF guard: only public http(s) targets may be relayed. Private/link-local
+// ranges, localhost and Cloudflare metadata endpoints are refused so the
+// sovereign relay can never be used to reach internal networks.
+function remoteIsSafeTarget(raw) {
+  let u;
+  try { u = new URL(raw); } catch { return false; }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+  const host = u.hostname.toLowerCase();
+  if (host === 'localhost' || host.endsWith('.localhost')) return false;
+  if (host === 'metadata.google.internal' || host === 'instance-data') return false;
+  if (/^(127\.|10\.|192\.168\.|169\.254\.|0\.|100\.(6[4-9]|7[0-9]|12[0-7])\.)/.test(host)) return false;
+  if (/^172\.(1[6-9]|2[0-9]|3[01])\./.test(host)) return false;
+  return true;
+}
+
+function remoteJson(data, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+  });
+}
+
+async function remoteDoFetch(rawUrl) {
+  const r = await fetch(rawUrl, {
+    headers: {
+      'User-Agent': 'EON-Remote/1.0 (sovereign-edge relay)',
+      'Accept': '*/*',
+    },
+    redirect: 'follow',
+  });
+  const bytes = new Uint8Array(await r.arrayBuffer());
+  let body = '';
+  try { body = new TextDecoder('utf-8', { fatal: false }).decode(bytes); }
+  catch { body = String.fromCharCode.apply(null, bytes.subarray(0, 4096)); }
+  return { status: r.status, body, contentType: r.headers.get('content-type') || '' };
+}
+
+async function handleRemoteFetch(request, env, url) {
+  const kv = env.EON_KV;
+  const raw = url.searchParams.get('url') || '';
+  if (!raw) return remoteJson({ ok: false, error: 'missing url param' }, 400);
+  if (!remoteIsSafeTarget(raw)) return remoteJson({ ok: false, error: 'unsafe target' }, 400);
+
+  const hash = remoteHash(raw);
+  const cached = await remoteCacheGet(kv, hash);
+  if (cached && cached.body) {
+    return remoteJson({
+      ok: true, status: cached.status, cached: true, from_cache: true,
+      source: 'sovereign-edge', url: raw, fetched_at: cached.fetched_at,
+      body: remoteTruncate(cached.body, REMOTE_BODY_TRUNCATE),
+    });
+  }
+
+  try {
+    const got = await remoteDoFetch(raw);
+    const entry = {
+      url: raw, status: got.status, body: got.body.slice(0, REMOTE_CACHE_CAP),
+      contentType: got.contentType, fetched_at: Date.now(),
+    };
+    await remoteCachePut(kv, hash, entry);
+    return remoteJson({
+      ok: true, status: got.status, cached: false, from_cache: false,
+      source: 'sovereign-edge', url: raw, fetched_at: entry.fetched_at,
+      body: remoteTruncate(got.body, REMOTE_BODY_TRUNCATE),
+    });
+  } catch (e) {
+    return remoteJson({ ok: false, error: 'fetch failed: ' + (e && e.message ? e.message : String(e)) }, 502);
+  }
+}
+
+async function handleRemoteMirror(request, env, url) {
+  const kv = env.EON_KV;
+  const raw = url.searchParams.get('url') || '';
+  let ref = url.searchParams.get('ref') || '';
+  if (!raw) return remoteJson({ ok: false, error: 'missing url param' }, 400);
+  if (!remoteIsSafeTarget(raw)) return remoteJson({ ok: false, error: 'unsafe target' }, 400);
+  if (!ref) ref = 'mirror-' + Date.now().toString(36) + '-' + remoteHash(raw);
+  if (!/^[A-Za-z0-9._-]+$/.test(ref)) return remoteJson({ ok: false, error: 'ref must match [A-Za-z0-9._-]' }, 400);
+
+  try {
+    const got = await remoteDoFetch(raw);
+    const body = got.body.slice(0, REMOTE_MIRROR_CAP);
+    const record = {
+      ref, url: raw, fetched_at: Date.now(), size: body.length,
+      status: got.status, contentType: got.contentType, body,
+    };
+    await remoteMirrorPut(kv, record);
+    return remoteJson({
+      ok: true, ref, url: raw, size: body.length, stored: true,
+      fetched_at: record.fetched_at, status: got.status,
+    });
+  } catch (e) {
+    return remoteJson({ ok: false, error: 'mirror failed: ' + (e && e.message ? e.message : String(e)) }, 502);
+  }
+}
+
+async function handleRemoteList(request, env, url) {
+  const kv = env.EON_KV;
+  const records = (await remoteKvGet(kv, 'remote:mirror:index')) || [];
+  const mirrors = records.map(({ body, ...meta }) => meta); // metadata only, no bodies
+  return remoteJson({
+    ok: true, count: mirrors.length, mirrors,
+    storage: kv ? 'kv' : 'in-memory-map', timestamp: Date.now(),
+  });
+}
+
+async function handleRemoteDiscover(request, env, url) {
+  const kv = env.EON_KV;
+  const index = (await remoteKvGet(kv, 'remote:mirror:index')) || [];
+  const out = {
+    ok: true,
+    organ: 'eon-remote',
+    version: REMOTE_VERSION,
+    worker: VERSION,
+    host: url.origin,                       // self-discovery — whatever origin the caller used
+    storage: kv ? 'kv' : 'in-memory-map',
+    mirrored: index.length,
+    endpoints: [
+      { path: '/api/remote/fetch', method: 'GET', params: ['url'], desc: 'sovereign fetch of an earthly URL (cached)' },
+      { path: '/api/remote/mirror', method: 'GET', params: ['url', 'ref'], desc: 'snapshot an earthly resource under a named ref' },
+      { path: '/api/remote/list', method: 'GET', params: [], desc: 'list mirrored resources' },
+      { path: '/api/remote/discover', method: 'GET', params: [], desc: 'this self-discovery document' },
+    ],
+    timestamp: Date.now(),
+  };
+  if (!kv) out.cached_entries = REMOTE_MEM_CACHE.size;
+  return remoteJson(out);
+}
+
+async function handleRemoteApi(request, env, url) {
+  const path = url.pathname;
+  if (path === '/api/remote/fetch' && request.method === 'GET') return handleRemoteFetch(request, env, url);
+  if (path === '/api/remote/mirror' && request.method === 'GET') return handleRemoteMirror(request, env, url);
+  if (path === '/api/remote/list' && request.method === 'GET') return handleRemoteList(request, env, url);
+  if (path === '/api/remote/discover' && request.method === 'GET') return handleRemoteDiscover(request, env, url);
+  return remoteJson({ ok: false, error: 'unknown remote route: ' + path }, 404);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 // WORKER ENTRY POINT
 // ═══════════════════════════════════════════════════════════════════════
 export default {
@@ -369,6 +586,23 @@ export default {
       }), { headers: { 'Content-Type': 'application/json' } });
     }
 
+    // ═══ SERVERLESS CLOUD IDE (Pure Dark Matter) — /ide + /api/ide/* ═══
+    if (url.pathname === '/ide' || url.pathname.startsWith('/ide/') || url.pathname.startsWith('/api/ide/')) {
+      return handleIde(request, url, kv, env.EON_D1, env);
+    }
+
+    // ═══ SOVEREIGN API — heartbeat / auto-genesis / fluid mesh / state sync ═══
+    // (/api/remote/* is matched first below; everything else under /api routes
+    // to the Sovereign Heartbeat + Infinite Memory State Sync handlers.)
+    if (url.pathname.startsWith('/api/') && !url.pathname.startsWith('/api/remote/')) {
+      return handleApi(request, url, kv, env);
+    }
+
+    // ═══ EON-REMOTE ORGAN (sovereign global access) ═══
+    if (url.pathname.startsWith('/api/remote/')) {
+      return handleRemoteApi(request, env, url);
+    }
+
     // Manual webhook endpoint (backup)
     if (url.pathname === '/webhook' && request.method === 'POST') {
       const update = await request.json();
@@ -382,9 +616,20 @@ export default {
     return new Response(`EON Cloud Bot ${VERSION} — 100% Cloudflare`);
   },
 
-  // Cron Trigger handler — polls Telegram every 30s
+  // Cron Trigger — polls Telegram + runs the Sovereign Heartbeat every minute
   async scheduled(event, env) {
     const kv = env.EON_KV;
-    await pollUpdates(kv);
+    await Promise.all([
+      pollUpdates(kv),
+      heartbeatTick(kv, env).then(async ({ action }) => {
+        // Auto-Genesis events are surfaced to the operator over Telegram.
+        if (action && action !== 'none') {
+          const label = String(action).startsWith('trigger')
+            ? '🧬 *AUTO-GENESIS TRIGGERED* — local mesh bridge is offline. Spawned an ephemeral cloud VM to take over hosting until reconnection.'
+            : '✅ *MESH RESTORED* — local bridge is back online. Ephemeral cloud VM commanded to cede control.';
+          await tgApi('sendMessage', { chat_id: CHAT_ID, text: label, parse_mode: 'Markdown' }).catch(() => {});
+        }
+      }),
+    ]);
   },
 };

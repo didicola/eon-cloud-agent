@@ -2,13 +2,41 @@ name = "eon-cloud-bot"
 main = "index.js"
 compatibility_date = "2024-01-01"
 
-# Cron Trigger — polls Telegram every 30 seconds
+# Sovereign Heartbeat cron — every minute the Brain polls Telegram AND probes
+# the local mesh bridge. If the local bridge is dead for N consecutive ticks,
+# the Worker commands EON-Wrangler (GitHub Actions/Koyeb) to spawn an
+# ephemeral genesis VM that takes over compute until local reconnects.
 [triggers]
-crons = ["*/1 * * * *"]
+crons = ["*/1 * * * *", "0 3 * * *"]
 
-# KV Namespace for conversation history + experiences
-# Create with: wrangler kv namespace create EON_KV
-# Then replace the ID below
+# KV Namespace for conversation history + experiences + sovereign state.
+# id = existing account namespace (didicola) for the EON Cloud memory.
 [[kv_namespaces]]
 binding = "EON_KV"
-id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+id = "ed237acbf16941aea96c2a60562aab97"
+
+# D1 — Pure Dark Matter IDE file/session storage (serverless state, no SQLite).
+[[d1_databases]]
+binding = "EON_D1"
+database_name = "asi-cloud-memory"
+database_id = "e5c42405-0fb9-4451-9e3f-0df4b63072eb"
+
+[vars]
+EON_VERSION = "10.0-sovereign-autogenesis"
+# .eon tunnel to the local mesh bridge. Any HTTP response = local alive.
+# When this tunnel dies, Auto-Genesis fires.
+EON_MESH_URL = "https://839301ae2a61a843f7bfb701f677195e.x.uplink.spot/"
+# Optional second probe (e.g. the local sovereign edge health endpoint).
+EON_MESH_URL2 = ""
+# Consecutive misses before spawning the ephemeral VM.
+GENESIS_MISSES = "2"
+# Anti-storm cooldown between genesis spawns.
+GENESIS_COOLDOWN_MIN = "15"
+# Auto-Genesis orchestrator (GitHub Actions primary).
+GENESIS_REPO = "didicola/eon-cloud-agent"
+GENESIS_WORKFLOW = "eon-genesis.yml"
+GENESIS_REF = "main"
+# Public base URL of this worker (passed to ephemeral VMs as the mesh URL).
+EON_SELF_URL = ""
+# Optional gate for /api/mesh/* + /api/state/restore + /api/genesis (POST).
+EON_MESH_TOKEN = ""

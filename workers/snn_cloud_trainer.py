@@ -3,7 +3,8 @@
 snn_trainer.py — Sovereign Bio-AI SNN trainer (Trigonometric Round Matrix edition).
 Runs as a DISPATCHED CLOUD task only (never launched locally with torch). Contains the
 trigonometric activations: SinLIFNeuron (oscillating sin threshold), CosInhibitoryLayer
-(cos coupling), LnMembranePotential (log1p membrane). Golden rule: ZERO local torch —
+(cos coupling), TanRateEncoder (tanh S-curve rate code), LnMembranePotential (log1p
+membrane). Golden rule: ZERO local torch —
 `import torch` lives INSIDE the training path, so a local run degrades gracefully.
 
 Executed by the mesh compute dispatcher on any edge node (twin/GH-Actions/proot),
@@ -52,6 +53,21 @@ class LnMembranePotential:
         return self.scale * math.log1p(max(x, -1.0))
 
 
+class TanRateEncoder:
+    """Boundary-sensitive rate encoder: tanh S-curve maps [0,1] inputs back to [0,1]
+    (tanh(k*x)/tanh(k)) while sharpening mid-range boundaries — a soft nonlinear
+    rate code for spiking neurons. Tensor-safe in the cloud path; math fallback local."""
+    def __init__(self, k=2.0):
+        self.k = k
+        self.norm = 0.9640275800758169  # tanh(2.0)
+
+    def encode(self, x):
+        if hasattr(x, "tanh"):  # torch.Tensor in the cloud training path
+            return (x * self.k).tanh() / self.norm
+        import math
+        return math.tanh(self.k * x) / self.norm
+
+
 def _default_weights_path(out):
     """Default weights file lives alongside --out as <out-base>.weights.json."""
     if out.endswith(".json"):
@@ -94,6 +110,7 @@ def main():
     neuron = SinLIFNeuron()
     coupling = CosInhibitoryLayer()
     membrane = LnMembranePotential()
+    encoder = TanRateEncoder()
 
     metrics = {"framework": "snn/lif+trig", "backend": "cpu", "epochs": args.epochs,
                "status": "ok", "device": "sovereign-cloud-node",
@@ -167,6 +184,7 @@ def main():
             for epoch in range(args.epochs):
                 correct, total = 0, 0
                 for data, target in loader:
+                    data = encoder.encode(data)  # TanRateEncoder: boundary-sensitive S-curve rate code
                     data = (data * 20)  # scale into spike regime; ~continuous input
                     mem1 = lif1.init_leaky()
                     mem2 = lif2.init_leaky()
