@@ -134,30 +134,26 @@ def main():
             class SinLIF(snn.Leaky):
                 """torch LIF with oscillating sin threshold (SinLIFNeuron applied per step)."""
                 def __init__(self, base=0.95, amp=0.05, period=8.0):
-                    super().__init__(beta=base)
+                    super().__init__(beta=base, init_hidden=True)
                     self.amp = amp
                     self.period = period
 
-                def forward(self, x):
+                def forward(self, x, mem):
                     step = getattr(self, "_step", 0)
                     self._step = step + 1
-                    thresh = neuron.threshold(step)
-                    # decay beta oscillates slightly with sin threshold; log1p membrane scaling
-                    x = membrane.activate(x.item()) if not isinstance(x, torch.Tensor) else x
-                    out = super().forward(x)
-                    # snntorch Leaky may return (spk, mem) tuple depending on version/output;
-                    # Sequential layers need the spike tensor only.
-                    return out[0] if isinstance(out, tuple) else out
+                    # oscillating sin threshold applied per simulation step
+                    self.threshold = neuron.threshold(step)
+                    return super().forward(x, mem)
 
-            model = torch.nn.Sequential(
-                torch.nn.Flatten(),
-                torch.nn.Linear(net_in, hidden),
-                SinLIF(),
-                torch.nn.Linear(hidden, hidden),
-                SinLIF(),
-                torch.nn.Linear(hidden, net_out),
-                snn.Leaky(beta=0.95, output=True),
-            )
+            # Canonical snntorch pattern: explicit mem state (init_hidden=True),
+            # layers called with (input, mem) per step -> no shared-graph double-backward.
+            fc1 = torch.nn.Linear(net_in, hidden)
+            lif1 = SinLIF()
+            fc2 = torch.nn.Linear(hidden, hidden)
+            lif2 = SinLIF()
+            fc3 = torch.nn.Linear(hidden, net_out)
+            lif3 = snn.Leaky(beta=0.95, init_hidden=True, output=True)
+            model = torch.nn.Sequential(fc1, lif1, fc2, lif2, fc3, lif3)
             opt = torch.optim.Adam(model.parameters(), lr=lr)
             loss_fn = SF.ce_rate_loss()
 
@@ -165,12 +161,18 @@ def main():
                 correct, total = 0, 0
                 for data, target in loader:
                     data = (data * 20)  # scale into spike regime; ~continuous input
+                    mem1 = lif1.init_leaky()
+                    mem2 = lif2.init_leaky()
+                    mem3 = lif3.init_leaky()
                     spk_rec = []
                     for step in range(num_steps):
-                        out = model(data)
-                        # final snn.Leaky(output=True) returns (spk, mem); some versions return spk only
-                        spk_out = out[0] if isinstance(out, tuple) else out
-                        spk_rec.append(spk_out)
+                        cur1 = fc1(data.view(data.size(0), -1))
+                        spk1, mem1 = lif1(cur1, mem1)
+                        cur2 = fc2(spk1)
+                        spk2, mem2 = lif2(cur2, mem2)
+                        cur3 = fc3(spk2)
+                        spk3, mem3 = lif3(cur3, mem3)
+                        spk_rec.append(spk3)
                     # ce_rate_loss expects (num_steps, N, C) and sums over time internally
                     spk_stack = torch.stack(spk_rec)          # (num_steps, N, C)
                     out_stack = spk_stack.sum(0)              # (N, C) for accuracy / spike counts
