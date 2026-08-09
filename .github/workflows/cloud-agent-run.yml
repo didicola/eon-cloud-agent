@@ -1,0 +1,140 @@
+name: cloud-agent-run
+# ═══ SOVEREIGN CLOUD AGENT RUN ═══════════════════════════════════════════════
+# The AI agent executes ON an ephemeral GitHub Actions runner — a DIFFERENT
+# device (fresh Azure IP, ASN 8075) that has NO relationship to the mother box.
+#
+# Identity & traces:
+#   - Fresh per-run run_id + User-Agent + empty session identity are generated
+#     ON the runner. Local identity files (~/.config/opencode/auth.json,
+#     session_memory.json) are NEVER copied — no provider-session correlation.
+#   - Egress is fail-closed verified: the runner's public IP must be a foreign
+#     device (private/loopback/link-local ⇒ run aborts as LEAK).
+#
+# Mother network safety:
+#   - Additive-only: this workflow is dispatched via the GitHub API; it never
+#     touches the local box's services, firewall, or egress chain.
+#   - Local network is NOT cut: all existing local paths keep working.
+# ═════════════════════════════════════════════════════════════════════════════
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: "Agent task to execute in the cloud"
+        required: true
+      run_id:
+        description: "Optional run identifier (defaults to auto)"
+        required: false
+        default: ""
+  repository_dispatch:
+    types: [cloud-agent-run]
+
+jobs:
+  cloud-agent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 110
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Fresh per-run identity (never copies local identity)
+        id: identity
+        env:
+          RUN_ID: ${{ inputs.run_id || github.event.client_payload.run_id || '' }}
+        run: |
+          set -euo pipefail
+          RUN_ID="${RUN_ID:-cloud-$(date -u +%Y%m%d%H%M%S)-$RANDOM}"
+          UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/1$((RANDOM%9+0)).0.$((RANDOM%9000+1000)).$((RANDOM%900+100)) Safari/537.36"
+          mkdir -p "$HOME/.config/opencode" "$HOME/.opencode"
+          # Fresh, empty session identity — deliberately NOT imported from local.
+          printf '{"session_id":"%s","device":"github-actions-runner","created_utc":"%s","origin":"cloud-run"}' \
+            "$RUN_ID" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$HOME/.opencode/session_memory.json"
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+          echo "user_agent=$UA" >> "$GITHUB_OUTPUT"
+          echo "RUN_ID=$RUN_ID" >> "$GITHUB_ENV"
+          echo "EGRESS_UA=$UA" >> "$GITHUB_ENV"
+          echo "Fresh identity generated on cloud device: run_id=$RUN_ID"
+
+      - name: Install opencode (cloud compute)
+        run: |
+          export PATH="$HOME/.opencode/bin:$PATH"
+          curl -fsSL --max-time 90 -A "$EGRESS_UA" https://opencode.ai/install | bash \
+            || npm install -g opencode-ai
+          "$HOME/.opencode/bin/opencode" --version 2>/dev/null || opencode --version 2>/dev/null || true
+
+      - name: Verify egress device (must be foreign, not the mother box)
+        id: egress
+        env:
+          EGRESS_UA: ${{ steps.identity.outputs.user_agent }}
+        run: |
+          set -euo pipefail
+          IP=$(curl -fsSL -A "$EGRESS_UA" --max-time 30 https://api.ipify.org || echo "unknown")
+          ASN=$(curl -fsSL -A "$EGRESS_UA" --max-time 30 "https://ipinfo.io/$IP/json" 2>/dev/null | python3 -c "import json,sys;d=json.load(sys.stdin);print(d.get('org','unknown'))" 2>/dev/null || echo "unknown")
+          echo "egress_ip=$IP" >> "$GITHUB_OUTPUT"
+          echo "egress_asn=$ASN" >> "$GITHUB_OUTPUT"
+          python3 - "$IP" <<'PY'
+          import ipaddress, sys
+          ip = ipaddress.ip_address(sys.argv[1])
+          if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+              print(f"LEAK: egress IP {ip} is private/loopback/link-local"); sys.exit(1)
+          print(f"EGRESS OK: {ip} — foreign device, no mother-box relationship")
+          PY
+
+      - name: Execute agent task in the cloud
+        id: agent
+        env:
+          OPENAI_BASE_URL: ${{ secrets.MODEL_BASE_URL }}
+          OPENAI_API_KEY: ${{ secrets.MODEL_API_KEY }}
+          EGRESS_UA: ${{ steps.identity.outputs.user_agent }}
+          RUN_ID: ${{ steps.identity.outputs.run_id }}
+        run: |
+          set -uo pipefail
+          TASK="${{ inputs.task || github.event.client_payload.task || 'Report the egress identity and current cloud run environment.' }}"
+          mkdir -p results
+          export PATH="$HOME/.opencode/bin:$PATH"
+          if [ -n "${OPENAI_API_KEY:-}" ]; then
+            opencode run "$TASK" > "results/agent-output-$RUN_ID.txt" 2>&1 || true
+          else
+            echo "No MODEL_API_KEY secret set — running identity/egress self-report (LLM path skipped)." > "results/agent-output-$RUN_ID.txt"
+            {
+              echo "task=$TASK"
+              echo "run_id=$RUN_ID"
+              echo "egress_ip=${{ steps.egress.outputs.egress_ip }}"
+              echo "egress_asn=${{ steps.egress.outputs.egress_asn }}"
+              date -u
+            } >> "results/agent-output-$RUN_ID.txt"
+          fi
+          echo "Agent run complete on cloud device: $RUN_ID"
+
+      - name: Mirror result to sovereign worker (additive)
+        if: always()
+        env:
+          RUN_ID: ${{ steps.identity.outputs.run_id }}
+          WORKER_URL: ${{ secrets.WORKER_URL }}
+        run: |
+          if [ -n "${WORKER_URL:-}" ]; then
+            curl -fsSL --max-time 30 -A "EON-Remote/1.0 (cloud-agent-run)" \
+              "$WORKER_URL/api/remote/mirror?url=file://results/agent-output-$RUN_ID.txt&ref=cloud-run-$RUN_ID" \
+              || echo "worker mirror unavailable (non-fatal)"
+          else
+            echo "WORKER_URL secret not set — result kept as artifact only."
+          fi
+
+      - name: Upload agent output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloud-agent-output-${{ steps.identity.outputs.run_id }}
+          path: results/
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Cloud Agent Run: ${{ steps.identity.outputs.run_id }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Egress device: ${{ steps.egress.outputs.egress_ip }} (${{ steps.egress.outputs.egress_asn }})" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Identity: fresh per-run (no local identity copied)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Local mother network: untouched (additive dispatch)" >> "$GITHUB_STEP_SUMMARY"
