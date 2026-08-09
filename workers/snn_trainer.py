@@ -134,7 +134,7 @@ def main():
             class SinLIF(snn.Leaky):
                 """torch LIF with oscillating sin threshold (SinLIFNeuron applied per step)."""
                 def __init__(self, base=0.95, amp=0.05, period=8.0):
-                    super().__init__(beta=base, init_hidden=True)
+                    super().__init__(beta=base)
                     self.amp = amp
                     self.period = period
 
@@ -147,14 +147,14 @@ def main():
                                                   dtype=mem.dtype, device=mem.device)
                     return super().forward(x, mem)
 
-            # Canonical snntorch pattern: explicit mem state (init_hidden=True),
+            # Canonical snntorch pattern: explicit mem state (init_hidden=False default),
             # layers called with (input, mem) per step -> no shared-graph double-backward.
             fc1 = torch.nn.Linear(net_in, hidden)
             lif1 = SinLIF()
             fc2 = torch.nn.Linear(hidden, hidden)
             lif2 = SinLIF()
             fc3 = torch.nn.Linear(hidden, net_out)
-            lif3 = snn.Leaky(beta=0.95, init_hidden=True, output=True)
+            lif3 = snn.Leaky(beta=0.95, output=True)
             model = torch.nn.Sequential(fc1, lif1, fc2, lif2, fc3, lif3)
             opt = torch.optim.Adam(model.parameters(), lr=lr)
             loss_fn = SF.ce_rate_loss()
