@@ -37,6 +37,12 @@ jobs:
           pip install --quiet torch torchvision --index-url https://download.pytorch.org/whl/cpu
           pip install --quiet snntorch
 
+      - name: Cache MNIST dataset
+        uses: actions/cache@v4
+        with:
+          path: /tmp/eon-mnist
+          key: eon-mnist-v1
+
       - name: Run SNN cloud trainer
         id: snn
         env:
