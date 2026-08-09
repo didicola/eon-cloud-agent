@@ -171,8 +171,10 @@ def main():
                         # final snn.Leaky(output=True) returns (spk, mem); some versions return spk only
                         spk_out = out[0] if isinstance(out, tuple) else out
                         spk_rec.append(spk_out)
-                    out_stack = torch.stack(spk_rec).sum(0)
-                    loss_val = loss_fn(out_stack, target)
+                    # ce_rate_loss expects (num_steps, N, C) and sums over time internally
+                    spk_stack = torch.stack(spk_rec)          # (num_steps, N, C)
+                    out_stack = spk_stack.sum(0)              # (N, C) for accuracy / spike counts
+                    loss_val = loss_fn(spk_stack, target)
                     train_loss += float(loss_val.item())
                     loss_count += 1
                     opt.zero_grad()
