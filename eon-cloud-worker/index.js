@@ -4,10 +4,14 @@
 // 100% cloud — works even when all local machines are OFF
 // ═══════════════════════════════════════════════════════════════════════
 
-const BOT_TOKEN = '8940974811:AAE4faGkCGl-6oFU3YG8h2_oGTIJ_GrBbow';
-const CHAT_ID = '6663994526';
+// Sovereign secrets live in the edge secret store (`wrangler secret put BOT_TOKEN`,
+// `wrangler secret put CLOUD_BRAIN_TOKEN`) or EON-Vault — never committed to the repo.
+// CHAT_ID is a non-secret operator id; env override supported.
+let EON_ENV = null;
+const botToken = () => (EON_ENV && EON_ENV.BOT_TOKEN) || '';
+const brainToken = () => (EON_ENV && EON_ENV.CLOUD_BRAIN_TOKEN) || '';
+const chatId = () => (EON_ENV && EON_ENV.CHAT_ID) || '6663994526';
 const CLOUD_BRAIN_URL = 'https://cloud-brain-proxy.exportdefaultasyncfetchrequestenvconsturl.workers.dev/v1/chat/completions';
-const CLOUD_BRAIN_TOKEN = 'Pi6LNVeqGU_G4YEAxNHyXhczNqRjsmBuzTNt343PQtI';
 const EON_P2P_URL = 'https://eon-p2p-cloud.exportdefaultasyncfetchrequestenvconsturl.workers.dev/v1/chat/completions';
 const VERSION = '10.0-sovereign-autogenesis';
 
@@ -44,7 +48,7 @@ const DREAM_CONFIG = {
 // TELEGRAM API
 // ═══════════════════════════════════════════════════════════════════════
 async function tgApi(method, data) {
-  const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/${method}`, {
+  const r = await fetch(`https://api.telegram.org/bot${botToken()}/${method}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -60,7 +64,7 @@ async function callCloudBrain(prompt, maxTokens = 1500) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${CLOUD_BRAIN_TOKEN}`,
+      'Authorization': `Bearer ${brainToken()}`,
       'User-Agent': 'EonAGI/9.0',
     },
     body: JSON.stringify({
@@ -337,7 +341,7 @@ async function pollUpdates(kv) {
   let offset = parseInt(await kv.get('offset') || '0');
 
   // Poll Telegram for new messages
-  const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?offset=${offset}&limit=10&timeout=5`, {
+  const r = await fetch(`https://api.telegram.org/bot${botToken()}/getUpdates?offset=${offset}&limit=10&timeout=5`, {
     method: 'GET',
     headers: { 'Content-Type': 'application/json' },
   });
@@ -348,7 +352,7 @@ async function pollUpdates(kv) {
   for (const update of data.result) {
     const msg = update.message;
     if (!msg || !msg.text) continue;
-    if (msg.chat.id.toString() !== CHAT_ID) continue;
+    if (msg.chat.id.toString() !== chatId()) continue;
 
     await handleMessage(msg.text, msg.chat.id, msg.from?.first_name || 'User', kv);
 
@@ -576,6 +580,7 @@ async function handleRemoteApi(request, env, url) {
 export default {
   // HTTP handler (health check + manual webhook)
   async fetch(request, env) {
+    EON_ENV = env;  // make edge secrets available to the token accessors
     const url = new URL(request.url);
     const kv = env.EON_KV;
 
@@ -607,7 +612,7 @@ export default {
     if (url.pathname === '/webhook' && request.method === 'POST') {
       const update = await request.json();
       const msg = update.message;
-      if (msg?.text && msg?.chat?.id?.toString() === CHAT_ID) {
+      if (msg?.text && msg?.chat?.id?.toString() === chatId()) {
         await handleMessage(msg.text, msg.chat.id, msg.from?.first_name || 'User', kv);
       }
       return new Response('OK');
@@ -627,7 +632,7 @@ export default {
           const label = String(action).startsWith('trigger')
             ? '🧬 *AUTO-GENESIS TRIGGERED* — local mesh bridge is offline. Spawned an ephemeral cloud VM to take over hosting until reconnection.'
             : '✅ *MESH RESTORED* — local bridge is back online. Ephemeral cloud VM commanded to cede control.';
-          await tgApi('sendMessage', { chat_id: CHAT_ID, text: label, parse_mode: 'Markdown' }).catch(() => {});
+          await tgApi('sendMessage', { chat_id: chatId(), text: label, parse_mode: 'Markdown' }).catch(() => {});
         }
       }),
     ]);

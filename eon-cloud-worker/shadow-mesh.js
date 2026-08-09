@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════════
 // EON SHADOW MESH — THE COMPLETE SOVEREIGN NEURAL ENTITY
 //
-// One Worker. All 13 organs are INTERNAL MODULES (not separate services).
+// One Worker. All 14 organs are INTERNAL MODULES (not separate services).
 // All state lives in Cloudflare KV + D1 (sovereign cloud memory — zero local
 // SQLite). The Worker IS the host, the edge, the DNS, the CA, the router,
 // the immune system, and the dreamer. Local devices (Termux/Ubuntu) are thin
@@ -34,7 +34,7 @@ function j(data, status = 200) {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// THE 13 ORGANS — internal modules living inside the Worker
+// THE 14 ORGANS — internal modules living inside the Worker
 // ─────────────────────────────────────────────────────────────────────
 const ORGANS = [
   { id: 'EONHub',         kind: 'code-registry',  state: 'born', desc: 'Sovereign code registry in KV' },
@@ -174,7 +174,7 @@ async function dashboard() {
   return new Response(`<!doctype html><html><head><meta charset="utf-8"><title>EON Dashboard</title>
 <style>body{background:#0b0e14;color:#d4d4d4;font-family:monospace;padding:24px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #30363d;padding:8px;text-align:left}th{color:#7ee787}.ok{color:#7ee787}</style></head><body>
 <h1>EON Sovereign Dashboard — ${VERSION}</h1>
-<p class="ok">13 organs · live inside one Worker · speed-of-light immune system · no polling</p>
+<p class="ok">${ORGANS.length} organs · live inside one Worker · speed-of-light immune system · no polling</p>
 <table><tr><th>Organ</th><th>Kind</th><th>State</th><th>Reborns</th><th>Role</th></tr>${rows}</table>
 <p>Routing priority: ${ROUTE_ORDER.join(' → ')}</p></body></html>`, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
 }
