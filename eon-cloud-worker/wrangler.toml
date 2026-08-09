@@ -22,6 +22,10 @@ database_name = "asi-cloud-memory"
 database_id = "e5c42405-0fb9-4451-9e3f-0df4b63072eb"
 
 [vars]
+# Secrets are NOT committed — set at deploy time:
+#   wrangler secret put BOT_TOKEN
+#   wrangler secret put CLOUD_BRAIN_TOKEN
+# (Telegram bot channel is an optional mirror; the Cloud runs without it.)
 EON_VERSION = "10.0-sovereign-autogenesis"
 # .eon tunnel to the local mesh bridge. Any HTTP response = local alive.
 # When this tunnel dies, Auto-Genesis fires.
