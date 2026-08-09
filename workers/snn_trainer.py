@@ -13,6 +13,7 @@ import argparse
 import json
 import os
 import time
+import traceback
 
 
 # ── Trigonometric activations (pure-python/math reference; torch variants live in train()) ──
@@ -143,7 +144,10 @@ def main():
                     thresh = neuron.threshold(step)
                     # decay beta oscillates slightly with sin threshold; log1p membrane scaling
                     x = membrane.activate(x.item()) if not isinstance(x, torch.Tensor) else x
-                    return super().forward(x)
+                    out = super().forward(x)
+                    # snntorch Leaky may return (spk, mem) tuple depending on version/output;
+                    # Sequential layers need the spike tensor only.
+                    return out[0] if isinstance(out, tuple) else out
 
             model = torch.nn.Sequential(
                 torch.nn.Flatten(),
@@ -163,7 +167,9 @@ def main():
                     data = (data * 20)  # scale into spike regime; ~continuous input
                     spk_rec = []
                     for step in range(num_steps):
-                        spk_out, _ = model(data)
+                        out = model(data)
+                        # final snn.Leaky(output=True) returns (spk, mem); some versions return spk only
+                        spk_out = out[0] if isinstance(out, tuple) else out
                         spk_rec.append(spk_out)
                     out_stack = torch.stack(spk_rec).sum(0)
                     loss_val = loss_fn(out_stack, target)
@@ -202,6 +208,10 @@ def main():
         except Exception as e:
             metrics["status"] = "degraded"
             metrics["train_err"] = f"{type(e).__name__}: {e}"
+            try:
+                metrics["traceback"] = traceback.format_exc().strip().splitlines()[-8:]
+            except Exception:
+                pass
             if weights is None:
                 weights = _pseudo_weights(args.epochs, 256)
                 shape = {"pseudo_fallback": True, "total": len(weights),
