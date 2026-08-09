@@ -1,0 +1,53 @@
+name: eon-genesis
+# Sovereign Auto-Genesis loop — spawned by the EON Worker heartbeat when the
+# local mesh bridge is detected offline. An ephemeral cloud VM takes over
+# compute (outbound-pull model) until the Worker dispatches a stop.
+on:
+  workflow_dispatch:
+    inputs:
+      event:
+        description: "genesis | stop"
+        required: true
+        default: "genesis"
+      mesh:
+        description: "Sovereign worker mesh URL"
+        required: false
+        default: ""
+      epoch:
+        description: "genesis epoch (dedupe)"
+        required: false
+        default: ""
+  repository_dispatch:
+    types: [eon-genesis]
+
+jobs:
+  genesis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 110
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Sovereign Genesis bootstrap (memory sync + compute takeover)
+        env:
+          EON_CLOUD: ${{ inputs.mesh || github.event.client_payload.mesh || '' }}
+          GENESIS_EVENT: ${{ inputs.event || github.event.client_payload.event || 'genesis' }}
+          GENESIS_EPOCH: ${{ inputs.epoch || github.event.client_payload.epoch || '' }}
+          GENESIS_MAX_MINUTES: "100"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 eon_genesis_bootstrap.py \
+            --event "$GENESIS_EVENT" \
+            --mesh "$EON_CLOUD" \
+            --epoch "$GENESIS_EPOCH" \
+            --max-minutes "$GENESIS_MAX_MINUTES"
+
+      - name: Report genesis outcome
+        run: |
+          echo "genesis_event=$GENESIS_EVENT" >> "$GITHUB_OUTPUT"
+          echo "Ephemeral genesis VM cycle finished."
