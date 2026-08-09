@@ -121,12 +121,17 @@ def main():
             import snntorch.functional as SF
             from torchvision import datasets, transforms
 
+            # Use the FULL strength of the ephemeral cloud runner (4 cores on GH Actions):
+            # torch defaults to a fraction of cores -> leaving CPU on the table.
+            torch.set_num_threads(max(2, int(os.cpu_count() or 2)))
+
             mnist = datasets.MNIST(root="/tmp/eon-mnist", download=True, train=True,
                                    transform=transforms.ToTensor())
             if args.samples and args.samples > 0:
                 mnist.data = mnist.data[:args.samples]
                 mnist.targets = mnist.targets[:args.samples]
-            loader = torch.utils.data.DataLoader(mnist, batch_size=64, shuffle=True)
+            loader = torch.utils.data.DataLoader(mnist, batch_size=256, shuffle=True,
+                                                 num_workers=2)
 
             net_in, hidden, net_out, num_steps = 784, 128, 10, 4
             lr = 1e-3
