@@ -1,0 +1,30 @@
+name: claim-probe
+# Round-matrix browser robot generator (probe): renders a claim URL in cloud Firefox,
+# screenshots what Cloudflare serves a datacenter IP (challenge? claim button? block?).
+on:
+  workflow_dispatch:
+    inputs:
+      claim_url:
+        description: "claim-preview URL to render"
+        required: true
+        type: string
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: install playwright firefox
+        run: |
+          pip install playwright
+          python3 -m playwright install firefox --with-deps
+      - name: render claim page
+        env:
+          CLAIM_URL: ${{ inputs.claim_url }}
+        run: python3 scripts/claim-probe.py
+      - name: upload screenshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: claim-shot
+          path: claim.png
