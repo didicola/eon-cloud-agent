@@ -1,0 +1,15 @@
+# STAGED ONLY — NOTHING PUSHED. Verify against repo on Warp/Ubuntu (github unreachable from this phone).
+# Connect repo in Render dashboard -> New -> Blueprint -> select repo. Owner deploy-click only.
+services:
+  - type: web
+    name: eon-cloud-agent
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: ./
+    healthCheckPath: /health
+    autoDeploy: true
+    # --- FILL-ME during verify step: copy each ENV name from the Dockerfile, values stay empty here ---
+    # envVars:
+    #   - key: FILL_ME_FROM_DOCKERFILE_ENV
+    #     sync: false
+    # NOTE: do NOT set PORT — Render injects it; the Dockerfile MUST listen on $PORT (verify step checks).
