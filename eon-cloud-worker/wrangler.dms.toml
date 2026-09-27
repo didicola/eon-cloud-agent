@@ -1,0 +1,24 @@
+name = "eon-deadmans-switch"
+main = "deadmans-switch.js"
+compatibility_date = "2024-01-01"
+
+# Dead Man's Switch — every 2 minutes probe the local mesh bridge; 2 misses
+# => spawn ephemeral genesis VM; reconnect => dispatch stop.
+[triggers]
+crons = ["*/2 * * * *"]
+
+[[kv_namespaces]]
+binding = "EON_KV"
+id = "ed237acbf16941aea96c2a60562aab97"
+
+[vars]
+EON_VERSION = "10.0-deadmans-switch"
+EON_MESH_URL = "https://839301ae2a61a843f7bfb701f677195e.x.uplink.spot/"
+EON_MESH_URL2 = ""
+GENESIS_MISSES = "2"
+GENESIS_COOLDOWN_MIN = "15"
+GENESIS_REPO = "didicola/eon-cloud-agent"
+GENESIS_WORKFLOW = "eon-genesis.yml"
+GENESIS_REF = "main"
+EON_SELF_URL = ""
+EON_MESH_TOKEN = ""

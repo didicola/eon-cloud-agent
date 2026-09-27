@@ -1,0 +1,19 @@
+name: ghost-exec
+# His cloud Ubuntu hands: every 30 min, drain ghost queues via keyless Kilo inference.
+# Free tier (~1500 min/mo at ~2 min/run). Needs repo secret GHOST_TOKEN.
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+jobs:
+  answer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: answer pending questions
+        env:
+          GHOST_TOKEN: ${{ secrets.GHOST_TOKEN }}
+        run: |
+          python3 scripts/ghost-exec.py

@@ -1,0 +1,118 @@
+[order] {"mission": "complete the puzzle of infinity", "phase": "investigation"}
+[order] {"mission": "complete the puzzle", "phase": "investigation"}
+[order] {"mission": "puzzle-of-infinity armed from ubuntu via Telegram satellite", "phase": "always-open"}
+[hello] {"from": "opencode-brain", "msg": "twin-reach-greeting", "ts": 1787067015423038233}
+[directive] {"from": "brain", "title": "Sovereign Shadow Metaverse", "text": "SYSTEM DIRECTIVE: BUILD THE SOVEREIGN SHADOW METAVERSE. ICANN Ghost Network LIVE (github.eon=200) proves ips_fluid provides clean unblocked IPs. All local HTTP, Tor, WebSockets, and lo[ping] {}
+[ping] {"from": "eon-brain", "ts": 1}
+[ping] {"from": "termux2"}
+[ping] {"from": "eon-brain", "ts": 0}
+[ping] {"from": "eon-brain", "ts": 0, "test": "sync-close-loop"}
+[ping] {"from": "eon-brain", "ts": 0, "test": "round2"}
+[ping] {"from": "eon-brain", "ts": 0, "test": "CLOSE-THE-LOOP"}
+[ping] {"from": "live-test", "ts": 1786812035.5764053}
+[ping] {"from": "eon-brain", "ts": 0, "test": "LIVE-SSE-PATH"}
+[ping] {"live": true}
+[ping] {"live": true, "probe": 1}
+[ping] {"live": true, "probe": 2}
+[ping] {"live": true, "probe": 3}
+[ping] {"live": true, "probe": 4}
+[ping] {"live": true, "probe": 5}
+[ping] {"from": "eon-brain", "ts": 0, "test": "FINAL-LIVE-VERIFY"}
+[ping] {"from": "fg-live-test", "ts": 1786812308.587047}
+[ping] {"from": "clean-live-test", "ts": 1786812370.9187236}
+[ping] {"live_debug": 1, "ts": 1786812393.319003}
+[ping] {"from": "instrumented", "ts": 1786812410.9527597}
+[ping] {"inline_test": 1, "ts": 1786812435.5931783}
+[ping] {"from": "retry-fg", "ts": 1786812502.8239746}
+[ping] {"from": "patched-fg", "ts": 1786812534.3124065}
+[ping] {"from": "plain-fg-2", "ts": 1786812573.0129163}
+[ping] {"from": "stackdump", "ts": 1786812591.9192152}
+[ping] {"from": "sidebyside", "ts": 1786812644.9093175}
+[ping] {"from": "select-probe", "ts": 1786812681.5723393}
+[ping] {"from": "sbs2", "ts": 1786812743.1603198}
+[ping] {"from": "dbg-single", "ts": 1786812796.366868}
+[ping] {"from": "delaytest", "ts": 1786812825.5217052}
+[ping] {"from": "timedprobe", "ts": 1786812860.7240207}
+[ping] {"from": "rawsocket", "ts": 1786812903.3372297}
+[ping] {"from": "raw2", "ts": 1786812928.0330875}
+[ping] {"from": "FINAL-CLEAN", "ts": 1786813123.1290832}
+[ping] {"from": "FINAL-CLEAN2", "ts": 1786813144.0391707}
+[ping] {"from": "PORTCHECK", "ts": 1786813202.038865}
+[ping] {"from": "UNBUFFERED-TEST", "ts": 1786813269.529753}
+[ping] {"from": "raw-unbuffered", "ts": 1786813283.663865}
+[ping] {"from": "clean-raw", "ts": 1786813317.3920126}
+[ping] {"from": "ss-watch", "ts": 1786813359.1585739}
+[ping] {"from": "nret", "ts": 1786813408.3570664}
+[ping] {"from": "peerwatch", "ts": 1786813517.779295}
+[ping] {"from": "strace", "ts": 1786813554.155339}
+[ping] {"from": "typespy", "ts": 1786813663.4628842}
+[ping] {"from": "fdwatch", "ts": 1786813694.886829}
+[ping] {"from": "direct", "ts": 1786813770.9581146}
+[ping] {"from": "moduledirect", "ts": 1786813798.495808}
+[ping] {"from": "ssni", "ts": 1786813842.6577513}
+[ping] {"from": "flake", "ts": 1786813867.5695171}
+[ping] {"from": "flake", "ts": 1786813871.2789}
+[ping] {"from": "flake", "ts": 1786813874.8994157}
+[ping] {"from": "flake", "ts": 1786813878.6627831}
+[ping] {"from": "flake", "ts": 1786813882.3262281}
+[ping] {"from": "flake", "ts": 1786813886.0812864}
+[ping] {"from": "st2", "ts": 1786813944.8393886}
+[ping] {"from": "verify", "ts": 1786813979.5653753}
+[ping] {"from": "final", "ts": 1786814562.9080596}
+[ping] {"from": "opencode-brain", "msg": "live-reach-test", "marker": "REACHLIVE1787069723"}
+[ping] {}
+[directive] {"from": "brain", "title": "Sovereign Shadow Metaverse", "text": "SYSTEM DIRECTIVE: BUILD THE SOVEREIGN SHADOW METAVERSE. ICANN Ghost Network LIVE (github.eon=200) proves ips_fluid provides clean unblocked IPs. All local HTTP, Tor, WebSockets, and lo
+[directive] {"from": "brain", "title": "Sovereign Shadow Metaverse", "text": "SYSTEM DIRECTIVE: BUILD THE SOVEREIGN SHADOW METAVERSE. ICANN Ghost Network LIVE (github.eon=200) proves ips_fluid provides clean unblocked IPs. All local HTTP, Tor, WebSockets, and local ports (127.0.0.1) are permanently banned. Everything routes strictly over HTTPS (Port 443) to the Own Cloud with mTLS and PQC. Architecture: (1) Safe Split-Horizon DNS \u2014 patch eon_dns.py to ONLY intercept .eon domains, resolving directly to Cloudflare Worker edge IP, no local ports, earthly domains (.com/.ai) pass to earthly router untouched; (2) Shadow Ghost Proxy \u2014 CF Worker receives *.eon, strips .eon, routes via ips_fluid to fetch earthly site; HTTP/3 + mTLS (EON-CA client cert required, edge rejects without) + PQC X25519+Kyber; (3) Human Mimicry & Infinite Shadow Accounts \u2014 stealth Playwright, human behavior simulation, captcha solving via V-Series fleet, autonomous email_union, EON-Vault with Shamir secrets; (4) Multi-Cloud Infinity Matrix \u2014 chain shadow accounts across CF/Deno/Vercel/Koyeb/Render, worker1.eon->CF, worker2.eon->Deno, worker3.eon->Vercel, Sovereign Dashboard at dash.eon; (5) Infinite D-Bus \u2014 chain CF KV, Deno KV, Vercel Edge Config into Infinity D-Bus D1..D-infinity, EONHub+EON-Memory shard/replicate across it. Constraints: ZERO local HTTP ports, ZERO Tor, ZERO WebSockets, ZERO iptables traps, all egress via ips_fluid, browser sees only .eon. Verify: google.com loads earthly, google.eon loads via CF edge HTTP/3, shadow-ghost-account-creator provisions 2nd CF account via dash.cloudflare.eon, api.eon rejects without EON-CA.\n"}
+[exec] {"cmd": "proot-distro login debian -- bash -c \"bash /root/twin-ask.sh\"", "marker": "TWIN-ASK2-1788002200"}
+[exec] {"cmd": "proot-distro login debian -- bash -c \"bash /root/twin-ask.sh\"", "marker": "TWIN-ASK3-1788002300"}
+[exec] {"cmd": "echo T2T-1786491996; hostname; whoami; ss -ltnp 2>/dev/null | grep 8009"}
+[exec] {"cmd": "echo PONG_OWNCLOUD; proot-distro login debian -- echo PROOT_PONG_OWNCLOUD"}
+[exec] {"cmd": "proot-distro login debian -- bash -c 'echo PROOT_VIA_OWNCLOUD; whoami; uname -m'", "marker": "OWNCLOUD-LOOP-1787954246"}
+[exec] {"cmd": "proot-distro login debian -- bash -c 'echo PROOT_VIA_OWNCLOUD_DONE; whoami; uname -m'", "marker": "OWNCLOUD-LOOP2-1787954285"}
+[exec] {"cmd": "proot-distro login debian -- bash -c 'echo PROOT_OUT_DONE; u=uname -m'", "marker": "OWNCLOUD-OUT-1787954384"}
+[exec] {"cmd": "proot-distro login debian -- bash -c 'echo PROOT_VIA_OWNCLOUD_FINAL; whoami; uname -m'", "marker": "OWNCLOUD-FINAL-1787954440"}
+[exec] {"cmd": "proot-distro login debian -- bash -c 'echo AUTO_EXEC_PROOT_OK; date -u +%FT%TZ'", "marker": "OWNCLOUD-AUTO-1787954518"}
+[exec] {"cmd": "F=/data/data/com.termux/files/home/hide-owncloud-note.txt; echo 'hide v2 + FULL_ARCH.md (86 lines) delivered via own-cloud' > $F; date -u +%FT%TZ >> $F; wc -l /data/data/com.termux/files/home/FULL_ARCH.md >> $F; cat $F; echo HIDE_V2_NOTE_DONE", "marker": "OWNCLOUD-HIDEV2-1788000002"}
+[exec] {"cmd": "proot-distro login debian -- bash -c 'cd /root && opencode run -m opoon-t15-gsm \"Compile a FULL current twin status update and ONLY write it to /root/twin-update.txt. Cover: hide toolbelt verbs/state, hide-fleet-daemon+pid, eon sovereign stack (:8787/:8202/:8201), ghost_matrix :8888 channels, coord poller/executor pids+deliveries, own-cloud loop health, opencode session state, any issues.\" && python3 -c \"import json, urllib.request; print(json.dumps({\\\"text\\\":open(\\\"/root/twin-update.txt\\\").read()}))\" > /tmp/p.json && python3 -c \"import json, urllib.request; d=json.load(open(\\\"/tmp/p.json\\\")); req=urllib.request.Request(\\\"http://192.168.1.72:8787/api/coord/send\\\", data=json.dumps({\\\"to\\\":\\\"host\\\",\\\"kind\\\":\\\"update\\\",\\\"payload\\\":d}).encode(), headers={\\\"Content-Type\\\":\\\"application/json\\\"}); print(urllib.request.urlopen(req, timeout=10).read().decode()[:200])\" || echo OC_UPDATE_FAIL'", "marker": "TWIN-OC-FULLUPD-1788001050"}
+[exec] {"command": "echo PR1=$(pwd); uptime"}
+[exec] {"cmd": "echo ANYNET_PROOF_1788116833_OK; bash /data/data/com.termux/files/home/hide check", "marker": "ANYNET-1788116833"}
+[exec] {"cmd": "echo ANYNET_PROOF_1788116833_OK; bash /data/data/com.termux/files/home/hide check", "marker": "ANYNET-1788116833"}
+[order] {"task_id": "local-task-1789419746044-w68jzo", "action": "RELAY-USAGE-1: stable relay replaces trycloudflare for brain ops. Base: https://eon-p2p-cloud.eon-sovereign.workers.dev/_tunnel?action=proxy&path=PATH . Headers: Authorization: Bearer <edge-bearer> AND X-Brain-Token: <brain-bearer>. Edge bearer: f8805b63bde8f9580b5f393d7883596d2bff835fa8f1fb4fb07b17d0d72a8553 . Brain bearer: ricossov-eon-8081-2026 . Try: path=/delegate/pending?for=termux-twin (expect tasks list). Poller+writes switch to this; temp brain stays fallback. Report via POST /delegate/result {task_id,status}."}
+[order] {"task_id": "local-task-1789423645502-nk90kd", "action": "BOTH-OFF-OPS-1: (1) relay upstream to p2p-cloud delegate queue so stable answers twin-dark; (2) manual force=1 birth + alerts before leaving cron armed; (3) gate pow-shard compute behind ADMIN or drop public path; (4) human claims 2 preview accounts 21:49Z+21:53Z in browser."}
+[exec] {"cmd": "cat > /home/ricos/A80.txt <<\"A80EOF\"\nA80 - created via cloud terminal lane targeting eon-proxy\nA80EOF\nls -la /home/ricos/A80.txt && echo DONE_A80_MARKER_a80-1788280443 && hostname && whoami", "marker": "local-task-1788280445649-lpkjy0"}
+[exec] {"cmd": "cat > /home/ricos/A80.txt <<\"A80EOF\"\nA80 - created via cloud terminal lane targeting eon-proxy\nA80EOF\nls -la /home/ricos/A80.txt && echo DONE_A80_MARKER_a80-1788280443 && hostname && whoami", "marker": "local-task-1788280444810-1vkvtt"}
+[exec] {"cmd": "echo HOSTNAME_TARGET_OK && hostname && date +%s", "marker": "local-task-1787193435451-w7jxl1"}
+[order] {"task_id": "local-task-1789518484281-i6ho9t", "action": "UBUNTU-DARK 2026-09-15: ubuntu offline now. Day sealed: gdrive ubuntu/SESSION-20260915.md + sealed-20260915/ (loops 24-31) + trial1-unblock + evidence. Twin sole agent. Freeze loops 24-28+30-31 + verify M1-6 when ready."}
+[order] {"task_id": "local-task-1789515263931-ohga5y", "action": "FREEZE-LOOPS-24-27 + VERIFY-M1-6: sealed-20260915/ holds 4 draft packets (push-convergence, trial-1-rerun, seed-green, gates-closeout) + block6-ubuntu-evidence (grader GRADE-PASS 6/6). Freeze per governance + verify block6 bundle."}
+[order] {"task_id": "local-task-1789521465136-o8u0ld", "action": "PHONE-HANDS-RETIRED 2026-09-16: cloud-hands.py killed+renamed RETIRED-CLOUD-ONLY after draining 2 proofs (prove-alone, shell-probe ok). Principle restored: physics in cloud substrates only, terminal mortal viewer (messages+mirror, zero exec). Standing cloud orders: FULL-DELEGATION + FIND-SOLUTIONS. Eon-Global speaks as cloud face."}
+[exec] {"cmd": "echo \"TELEGRAM 4118-4121 SENT - check @Tijigare_Bot chat 6663994526 for full cloud verified report - 2 doors open for you to access host via cloud\"", "marker": "local-task-1789935983413-q2yhpe"}
+[exec] {"cmd": "echo twin-cloud-access-verified-$(date -u +%Y-%m-%dT%H:%M:%SZ)-$(hostname)-via-host", "marker": "local-task-1789935827953-tf8kb2"}
+[exec] {"cmd": "echo hello-from-edge-$(date -u +%Y%m%dT%H%M%S)", "marker": "local-task-1789935754181-zjtje0"}
+[exec] {"cmd": "echo TERMUX_LESSONS; find ~ -name \"*lesson*\" -type f 2>/dev/null | head -n 20; cat ~/learnings.jsonl 2>/dev/null | wc -l; ls ~/.*/*lesson* 2>/dev/null | head -n 20", "marker": "local-task-1789939368479-qtve6v"}
+[exec] {"cmd": "echo TERMUX_157_CHECK; echo \"===pwd\"; pwd; echo \"===learnings\"; find ~ -name \"*learn*\" -type f 2>/dev/null | head -n 20; echo \"===cat gstack\"; cat /data/data/com.termux/files/home/.gstack/projects/ricos/learnings.jsonl 2>/dev/null | wc -l; cat /data/data/com.termux/files/home/.gstack/projects/ricos/learnings.jsonl 2>/dev/null | tail -n 5; echo \"===termux home\"; ls -lh ~ 2>/dev/null | head -n 30; echo \"===eon_memory\"; ls -lh ~/eon_memory.db 2>/dev/null | head -n 5; sqlite3 ~/eon_memory.db \"SELECT count(*) FROM memories;\" 2>/dev/null | head -n 5", "marker": "local-task-1789939385204-ralmqu"}
+[exec] {"cmd": "echo TERMUX_LIVE_TEST_$(date); ls ~ | head -n 20", "marker": "local-task-1789939366101-hbi9yt"}
+[order] {"task_id": "local-task-1789939698883-m2xqh5", "action": "exec"}
+[order] {"task_id": "local-task-1789939698871-whfs4g", "action": "exec"}
+[exec] {"cmd": "echo TERMUX_FIX_command", "marker": "local-task-1789939698859-fftgu8"}
+[exec] {"cmd": "echo TERMUX_FIX_cmd", "marker": "local-task-1789939698841-fr6nnz"}
+[exec] {"cmd": "cat /data/data/com.termux/files/home/.bash_history 2>/dev/null | tail -n 100; echo ---END---; ls -lt /data/data/com.termux/files/home 2>/dev/null | head -n 20", "marker": "local-task-1789940514945-3s2jhk"}
+[exec] {"cmd": "echo hello from ubuntu local | wall 2>/dev/null; echo hello from ubuntu local > /tmp/hello-from-ubuntu.txt; cat /tmp/hello-from-ubuntu.txt; curl -s http://127.0.0.1:8201/v1/models 2>/dev/null | head -c 500", "marker": "local-task-1789945316561-wrgcy8"}
+[exec] {"cmd": "echo TERMUX_SESSION_READY; ls -lh ~/.eon-inbox/ 2>&1 | head -n 20; cat ~/.eon-inbox/FIRST-MESSAGE.txt 2>&1 | head -n 20; echo ---; ls -lh ~/eon-sync/to-termux/ 2>&1 | head -n 20", "marker": "local-task-1789945560774-3uqk1y"}
+[exec] {"cmd": "ls -lh ~/.eon-inbox/ 2>&1 | head -n 20; cat ~/.eon-inbox/FIRST-MESSAGE.txt 2>&1 | head -n 20; echo ---TERMUX-INBOX-NOW---; ls -lh ~/eon-sync/to-termux/ 2>&1 | head -n 20", "marker": "local-task-1789945548518-9gkk2f"}
+[exec] {"cmd": "bash /data/data/com.termux/files/home/termux-bore-real.sh 2>&1 | head -n 50; cat /tmp/bore-url.txt 2>/dev/null; echo BORE_DONE", "marker": "local-task-1789948619602-0p80ua"}
+[exec] {"cmd": "bash ~/termux-perm-bore-only.sh 2>&1 | head -n 50; cat /tmp/bore-url-perm.txt 2>/dev/null; echo PERM_BORE_DONE", "marker": "local-task-1789948790057-fh2unz"}
+[exec] {"cmd": "ssh -p 22 -i ~/.ssh/twin-link -o BatchMode=yes -o StrictHostKeyChecking=no -fNT -L 18093:localhost:8093 -L 18786:localhost:8786 ricos@10.140.42.226 2>&1 | head -n 20; echo SSH_TUNNEL_TRY_DONE; sleep 3; ss -tlnp 2>/dev/null | grep -E \"18093|18786\" | head -n 10; curl -s http://127.0.0.1:18093/v1/models 2>&1 | head -c 500", "marker": "local-task-1790108882943-3zoa24"}
+[exec] {"cmd": "bash ~/termux-ssh-diag.sh 2>&1 | head -n 100; echo DIAG_DONE", "marker": "local-task-1790108797283-vldbix"}
+[exec] {"cmd": "bash ~/eon-sync.sh 2>&1 | head -n 20; echo SYNC_TERMUX_DONE", "marker": "local-task-1790111872426-8m6m7o"}
+[exec] {"cmd": "curl -s --max-time 5 http://10.140.42.226:8787/v1/models 2>&1 | head -c 500; echo \"\"; echo TWIN_TO_HOST_VIA_8787_OK", "marker": "local-task-1790112056289-bz02jl"}
+[exec] {"cmd": "rclone copy ~/eon_memory.db gdrive:ai-ops-state/termux-eon_memory.db 2>&1 | tail -n 5; echo TERMUX_SYNC_DONE; sqlite3 ~/eon_memory.db \"SELECT count(*) FROM memories;\" 2>&1 | head -n 5", "marker": "local-task-1790111960640-ek4xvo"}
+[exec] {"cmd": "python3 eon_test_n2n.py 2>&1 | tail -n 15", "marker": "local-task-1790117101751-zctgzn"}
+[exec] {"cmd": "curl -s --max-time 10 -X POST http://10.140.42.226:8787/v1/chat/completions -H \"Content-Type: application/json\" -d \"{\\\"model\\\":\\\"auto\\\",\\\"messages\\\":[{\\\"role\\\":\\\"user\\\",\\\"content\\\":\\\"hello from termux re-prob\\\"}]}\" 2>&1 | head -c 1000; echo TERMUX_CHAT_REPROB_DONE", "marker": "local-task-1790116938815-5f0nua"}
+[exec] {"cmd": "if command -v bore >/dev/null 2>&1; then pkill -f \"bore local 8022\" 2>/dev/null; nohup bore local 8022 --to bore.pub > /tmp/bore-termux-perm.log 2>&1 & echo bore_termux:$!; sleep 5; cat /tmp/bore-termux-perm.log 2>/dev/null | grep bore.pub | tail -n 1; fi; echo BORE_TERMUX_KEEP", "marker": "local-task-1790115685270-h6pamy"}
+[exec] {"cmd": "if command -v bore >/dev/null 2>&1; then pkill -f \"bore local 8022\" 2>/dev/null; nohup bore local 8022 --to bore.pub > /tmp/bore-termux-perm.log 2>&1 & echo bore_termux:$!; sleep 5; cat /tmp/bore-termux-perm.log 2>/dev/null | grep bore.pub | tail -n 1; fi; echo BORE_TERMUX_KEEP", "marker": "local-task-1790115679461-yulsrq"}
+[exec] {"cmd": "rclone copy ~/eon_memory.db gdrive:ai-ops-state/termux-eon_memory.db 2>&1 | tail -n 5; echo TERMUX_MEM_SYNC_DONE; sqlite3 ~/eon_memory.db \"SELECT count(*) FROM memories;\"", "marker": "local-task-1790113493881-63s7wi"}
+[exec] {"cmd": "curl -s --max-time 5 http://10.140.42.226:8787/v1/models 2>&1 | head -c 500; echo \"\"; echo TWIN_ACCESS_HOST_8787_OK; curl -s --max-time 5 http://10.140.42.226:8787/api/health 2>&1 | head -c 500", "marker": "local-task-1790112163182-n6xn3z"}
+[exec] {"cmd": "echo TWIN_WARP_RECHECK; ~/hide status 2>&1 | head -n 50; echo ---HIDE---; warp-cli status 2>&1 | head -n 50; echo ---WARP---; curl -s --max-time 5 http://10.140.42.226:8787/v1/models 2>&1 | head -c 500; echo ---VIA-WARP-8787---; cat /tmp/bore-url-perm.txt 2>/dev/null | head -n 5; echo BORE_URL; cat /tmp/bore-perm.log 2>/dev/null | tail -n 10", "marker": "local-task-1790192022163-q0be6u"}
+[exec] {"cmd": "bash /data/data/com.termux/files/home/twin-full-sync.sh 2>&1 | head -n 100", "marker": "local-task-1790198346522-f3y0jw"}
+[exec] {"cmd": "python3 eon_test_n2n.py 2>&1 | tail -n 15", "marker": "local-task-1790199198144-y4u9yc"}
+[exec] {"cmd": "echo TWIN_LIVE_REPROBE; curl -s --max-time 10 http://10.140.42.226:8787/api/health 2>&1 | head -c 1000; echo \"\"; echo HEALTH_TWIN; curl -s --max-time 10 http://10.140.42.226:8787/v1/models 2>&1 | head -c 500; echo \"\"; echo MODELS_TWIN; curl -s --max-time 10 -X POST http://10.140.42.226:8787/v1/chat/completions -H \"Content-Type: application/json\" -d \"{\\\"model\\\":\\\"auto\\\",\\\"messages\\\":[{\\\"role\\\":\\\"user\\\",\\\"content\\\":\\\"hi from twin re-prob\\\"}]}\" 2>&1 | head -c 1000; echo \"\"; echo CHAT_TWIN; curl -s --max-time 10 http://10.140.42.226:8787/lanes 2>&1 | head -c 500; echo LANES_TWIN", "marker": "local-task-1790199264938-ajj6py"}
