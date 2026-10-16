@@ -26,7 +26,7 @@ start_tunnel() {
   if [ -n "$URL" ]; then
     echo "$URL" > /tmp/eon-tunnel-url.txt
     echo "[✓] Tunnel: $URL"
-    curl -s --max-time 10 "https://api.telegram.org/bot8940974811:AAE4faGkCGl-6oFU3YG8h2_oGTIJ_GrBbow/setWebhook" \
+    curl -s --max-time 10 "https://api.telegram.org/botREDACTED_DEAD_TOKEN/setWebhook" \
       -X POST -H "Content-Type: application/json" \
       -d "{\"url\":\"${URL}/webhook\",\"max_connections\":40,\"allowed_updates\":[\"message\"]}" | \
       python3 -c "import json,sys; d=json.load(sys.stdin); print('[✓] Webhook: OK' if d.get('ok') else '[✗] Webhook: FAIL')"

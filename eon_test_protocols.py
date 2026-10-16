@@ -42,7 +42,7 @@ def test_connectivity():
         return urllib.request.urlopen(req, timeout=10).status
     
     endpoints = [
-        ("Telegram API", "https://api.telegram.org/bot8940974811:AAE4faGkCGl-6oFU3YG8h2_oGTIJ_GrBbow/getMe"),
+        ("Telegram API", "https://api.telegram.org/botREDACTED_DEAD_TOKEN/getMe"),
         ("Cloud Brain", "https://cloud-brain-proxy.exportdefaultasyncfetchrequestenvconsturl.workers.dev/v1/models"),
     ]
     for name, url in endpoints:

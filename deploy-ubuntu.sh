@@ -114,7 +114,7 @@ sleep 20
 echo "━━━ 13. Setting webhook ━━━"
 URL=$(grep -o "https://[a-z0-9-]*\.trycloudflare\.com" /tmp/cf-chat.log | tail -1)
 if [ -n "$URL" ]; then
-    curl -s --max-time 20 "https://api.telegram.org/bot8940974811:AAE4faGkCGl-6oFU3YG8h2_oGTIJ_GrBbow/setWebhook" \
+    curl -s --max-time 20 "https://api.telegram.org/botREDACTED_DEAD_TOKEN/setWebhook" \
         -X POST -H "Content-Type: application/json" \
         -d "{\"url\":\"${URL}/webhook\",\"max_connections\":40,\"allowed_updates\":[\"message\"]}"
     echo ""

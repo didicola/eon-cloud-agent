@@ -5,3 +5,7 @@ logs/
 
 # private key material must never be committed (untracked 2026-10-16)
 certs/*.key
+
+# never track bytecode (was shipping compiled tokens)
+__pycache__/
+*.pyc

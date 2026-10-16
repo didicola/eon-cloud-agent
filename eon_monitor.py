@@ -108,7 +108,7 @@ def run_health_check():
     # Cloud services
     cloud_checks = [
         ("cloud-brain", "https://cloud-brain-proxy.exportdefaultasyncfetchrequestenvconsturl.workers.dev/v1/models"),
-        ("telegram-api", "https://api.telegram.org/bot8940974811:AAE4faGkCGl-6oFU3YG8h2_oGTIJ_GrBbow/getMe"),
+        ("telegram-api", "https://api.telegram.org/botREDACTED_DEAD_TOKEN/getMe"),
         ("eon-p2p", "https://eon-p2p-cloud.exportdefaultasyncfetchrequestenvconsturl.workers.dev/"),
     ]
     
