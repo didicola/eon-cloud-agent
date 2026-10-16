@@ -2,7 +2,7 @@
 # EON Persistent Watchdog — checks every 60s, restarts if needed
 # Crontab: * * * * * /root/eon-watchdog.sh
 LOG="/tmp/eon-watchdog.log"
-BOT_TOKEN="8940974811:AAE4faGkCGl-6oFU3YG8h2_oGTIJ_GrBbow"
+BOT_TOKEN=""
 LOG_MAX=2000
 
 log() { echo "[$(date '+%H:%M:%S')] $1" >> "$LOG"; }

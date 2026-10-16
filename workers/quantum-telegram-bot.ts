@@ -1,7 +1,7 @@
 // EON Quantum Cloud Telegram Bot — Deno Deploy
 // Permanent, no WAF, instant webhook responses
 
-const BOT_TOKEN = '8940974811:AAE4faGkCGl-6oFU3YG8h2_oGTIJ_GrBbow';
+const BOT_TOKEN = "";
 const CHAT_ID = '6663994526';
 const VERSION = '5.0-quantum-cloud';
 const CLOUD_BRAIN = 'https://cloud-brain-proxy.exportdefaultasyncfetchrequestenvconsturl.workers.dev';

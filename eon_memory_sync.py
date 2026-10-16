@@ -8,7 +8,7 @@ import urllib.request, json, os, sys, time, sqlite3, hashlib
 
 CLOUD_URL = "https://cloud-brain-proxy.exportdefaultasyncfetchrequestenvconsturl.workers.dev/v1/chat/completions"
 AUTH_TOKEN = os.environ.get("EON_CLOUD_BRAIN_TOKEN", "")
-BOT_TOKEN = "8940974811:AAE4faGkCGl-6oFU3YG8h2_oGTIJ_GrBbow"
+BOT_TOKEN = ""
 CHAT_ID = "6663994526"
 
 # Phase 3 (Parallel World): D1 as source of truth.

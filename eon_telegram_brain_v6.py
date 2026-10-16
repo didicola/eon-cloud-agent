@@ -6,7 +6,7 @@ Falls back across workers/models; never crashes on a message.
 """
 import urllib.request, json, os, sys, time, ssl
 
-BOT_TOKEN = "8940974811:AAE4faGkCGl-6oFU3YG8h2_oGTIJ_GrBbow"
+BOT_TOKEN = ""
 CHAT_ID = "6663994526"
 POLL_TIMEOUT = 30
 LAST_UPDATE = 0

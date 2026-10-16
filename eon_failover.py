@@ -5,7 +5,7 @@ Monitors all services, restarts dead ones, takes over if primary machine dies.
 """
 import urllib.request, json, os, sys, time, subprocess, sqlite3
 
-BOT_TOKEN = "8940974811:AAE4faGkCGl-6oFU3YG8h2_oGTIJ_GrBbow"
+BOT_TOKEN = ""
 CHAT_ID = "6663994526"
 CHECK_INTERVAL = 30  # seconds
 MACHINE_ID = os.environ.get("EON_MACHINE_ID", "termux")

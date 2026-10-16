@@ -6,7 +6,7 @@ Each message gets a tracking ID. Receiver ACKs. Auto-retry on failure.
 """
 import urllib.request, json, os, sys, time, hashlib, sqlite3, threading
 
-BOT_TOKEN = "8940974811:AAE4faGkCGl-6oFU3YG8h2_oGTIJ_GrBbow"
+BOT_TOKEN = ""
 CHAT_ID = "6663994526"
 CLOUD_URL = "https://cloud-brain-proxy.exportdefaultasyncfetchrequestenvconsturl.workers.dev/v1/chat/completions"
 CLOUD_TOKEN = os.environ.get("EON_CLOUD_BRAIN_TOKEN", "")

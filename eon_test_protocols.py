@@ -146,7 +146,7 @@ def test_cloud_brain():
 def test_telegram():
     print("\n═══ TELEGRAM TESTS ═══")
     
-    BOT_TOKEN = "8940974811:AAE4faGkCGl-6oFU3YG8h2_oGTIJ_GrBbow"
+    BOT_TOKEN = ""
     CHAT_ID = "6663994526"
     
     def tg_api(method, data=None):
@@ -204,7 +204,7 @@ def test_security():
     
     # 191-200: Token Validation
     test("Auth token format", lambda: len(os.environ.get("EON_CLOUD_BRAIN_TOKEN", "test")) > 0)
-    test("Bot token format", lambda: ":" in "8940974811:AAE4faGkCGl-6oFU3YG8h2_oGTIJ_GrBbow")
+    test("Bot token format", lambda: ":" in "")
     
     # 201-210: HTTPS Verification
     ctx = __import__('ssl').create_default_context()
@@ -306,7 +306,7 @@ def test_e2e():
             cloud_response = json.loads(r.read())
         
         # 5. Telegram notification
-        BOT_TOKEN = "8940974811:AAE4faGkCGl-6oFU3YG8h2_oGTIJ_GrBbow"
+        BOT_TOKEN = ""
         CHAT_ID = "6663994526"
         tg_payload = json.dumps({"chat_id": CHAT_ID, "text": f"E2E Test Complete: {result[0]}"}).encode()
         tg_req = urllib.request.Request(f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage", data=tg_payload, headers={"Content-Type": "application/json"}, method="POST")

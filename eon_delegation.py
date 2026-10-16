@@ -6,7 +6,7 @@ from datetime import datetime
 MACHINE = "ubuntu"
 ARCHIVE = "/mnt/fluid-cloud/ai-archive"
 QUEUE_DB = os.path.expanduser("~/.eon/delegation.db")
-BOT_TOKEN = "8940974811:AAE4faGkCGl-6oFU3YG8h2_oGTIJ_GrBbow"
+BOT_TOKEN = ""
 CHAT_ID = "6663994526"
 
 NODES = [

@@ -5,7 +5,7 @@ Usage: python3 eon_send_order.py "ls -la"
 """
 import urllib.request, json, os, sys, time
 
-BOT_TOKEN = "8940974811:AAE4faGkCGl-6oFU3YG8h2_oGTIJ_GrBbow"
+BOT_TOKEN = ""
 CHAT_ID = "6663994526"
 CMD_PREFIX = "[CMD]"
 RESP_PREFIX = "[RESP]"

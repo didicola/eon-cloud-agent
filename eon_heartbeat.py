@@ -6,7 +6,7 @@ Detects failure within 30 seconds. Bandwidth: ~200 bytes per heartbeat.
 """
 import urllib.request, json, os, sys, time, hashlib, sqlite3
 
-BOT_TOKEN = "8940974811:AAE4faGkCGl-6oFU3YG8h2_oGTIJ_GrBbow"
+BOT_TOKEN = ""
 CHAT_ID = "6663994526"
 HEARTBEAT_INTERVAL = 15  # seconds
 FAILURE_THRESHOLD = 3    # missed heartbeats = dead (45 seconds)

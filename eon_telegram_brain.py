@@ -9,7 +9,7 @@ import urllib.request, json, os, sys, time, traceback, socket, ssl
 sys.path.insert(0, os.path.expanduser("~"))
 from eon_mega_brain import call_worker, WORKERS, VERSION, chat
 
-BOT_TOKEN = "8940974811:AAE4faGkCGl-6oFU3YG8h2_oGTIJ_GrBbow"
+BOT_TOKEN = ""
 CHAT_ID = "6663994526"
 POLL_TIMEOUT = 30
 LAST_UPDATE = 0

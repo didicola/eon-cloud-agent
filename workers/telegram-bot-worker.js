@@ -4,7 +4,7 @@
 
 const CLOUD_BRAIN = 'https://cloud-brain-proxy.exportdefaultasyncfetchrequestenvconsturl.workers.dev';
 const BRAIN_TOKEN = 'Pi6LNVeqGU_G4YEAxNHyXhczNqRjsmBuzTNt343PQtI';
-const BOT_TOKEN = '8940974811:AAE4faGkCGl-6oFU3YG8h2_oGTIJ_GrBbow';
+const BOT_TOKEN = "";
 const CHAT_ID = '6663994526';
 const VERSION = '5.0-universal';
 

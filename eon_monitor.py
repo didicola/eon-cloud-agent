@@ -5,7 +5,7 @@ Monitors all services and sends detailed status via Telegram.
 """
 import urllib.request, json, os, sys, time, subprocess, sqlite3
 
-BOT_TOKEN = "8940974811:AAE4faGkCGl-6oFU3YG8h2_oGTIJ_GrBbow"
+BOT_TOKEN = ""
 CHAT_ID = "6663994526"
 MACHINE_ID = os.environ.get("EON_MACHINE_ID", "termux")
 MONITOR_DB = os.path.expanduser("~/.eon/monitor.db")

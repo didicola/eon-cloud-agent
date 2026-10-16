@@ -6,7 +6,7 @@ This runs on the TARGET machine (Ubuntu) and listens for orders from Termux.
 """
 import urllib.request, json, os, sys, time, subprocess, hashlib
 
-BOT_TOKEN = "8940974811:AAE4faGkCGl-6oFU3YG8h2_oGTIJ_GrBbow"
+BOT_TOKEN = ""
 CHAT_ID = "6663994526"
 MACHINE_ID = os.environ.get("EON_MACHINE_ID", "ubuntu")
 CMD_PREFIX = "[CMD]"

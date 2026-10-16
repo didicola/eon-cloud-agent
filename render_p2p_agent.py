@@ -1,7 +1,7 @@
 import os, threading, requests, time, json
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8940974811:AAE4faGkCGl-6oFU3YG8h2_oGTIJ_GrBbow")
+TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 CHAT_ID = 6663994526
 CLOUD_P2P_URL = "https://eon-p2p-cloud.exportdefaultasyncfetchrequestenvconsturl.workers.dev"
 BRIDGE_URL = "https://eon-hybrid-bridge.exportdefaultasyncfetchrequestenvconsturl.workers.dev"

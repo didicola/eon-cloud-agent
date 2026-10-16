@@ -221,7 +221,7 @@ class GitHubFallbackTransport:
 class TelegramLegacyTransport:
     """Legacy Telegram transport - limited but always available"""
     def __init__(self):
-        self.bot_token = "8940974811:AAE4faGkCGl-6oFU3YG8h2_oGTIJ_GrBbow"
+        self.bot_token = ""
         self.chat_id = "6663994526"
 
     def start(self, channel):

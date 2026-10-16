@@ -2,3 +2,6 @@ kv/
 logs/
 *.db
 *.log
+
+# private key material must never be committed (untracked 2026-10-16)
+certs/*.key
